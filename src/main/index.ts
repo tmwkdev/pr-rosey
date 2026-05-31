@@ -1,8 +1,9 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { ipcChannels } from "../shared/ipc.js";
 import { checkDependencies } from "./dependencyCheckService.js";
+import { fetchAuthoredOpenPullRequests } from "./pullRequestService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,20 @@ function createWindow(): void {
 }
 
 ipcMain.handle(ipcChannels.checkDependencies, () => checkDependencies());
+ipcMain.handle(ipcChannels.fetchPullRequests, () => fetchAuthoredOpenPullRequests());
+ipcMain.handle(ipcChannels.openPullRequestUrl, async (_event, url: unknown) => {
+  if (typeof url !== "string") {
+    throw new Error("Pull request URL must be a string.");
+  }
+
+  const parsedUrl = new URL(url);
+
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("Pull request URL must use http or https.");
+  }
+
+  await shell.openExternal(parsedUrl.toString());
+});
 
 void app.whenReady().then(() => {
   createWindow();

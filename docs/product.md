@@ -13,10 +13,12 @@ hosted backend.
 - Setup/readiness screen.
 - Local dependency checks for `gh`, `gh auth status`, and `git`.
 - Manual rerun of dependency checks.
+- Open PR list for the authenticated `gh` user.
+- Manual refresh of authored open PR discovery.
+- Browser handoff for opening a PR URL.
 
 ## Not Yet Product Scope
 
-- PR discovery.
 - CI inspection.
 - Prompt generation.
 - GitHub OAuth or hosted auth.
