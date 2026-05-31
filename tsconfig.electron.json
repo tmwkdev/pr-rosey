@@ -10,7 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "rootDir": "src",
     "outDir": "dist-electron",
-    "types": ["node", "electron"]
+    "types": ["node", "electron", "electron-vite/node"]
   },
   "include": ["src/main/**/*", "src/preload/**/*", "src/shared/**/*"],
   "exclude": ["**/*.test.ts", "**/*.test.tsx"]
