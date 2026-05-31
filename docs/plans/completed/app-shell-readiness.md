@@ -1,4 +1,4 @@
-# Step 1 - App Shell And Agent Harness
+# App Shell And Dependency Readiness
 
 ## Goal
 
@@ -19,9 +19,8 @@ needed for future pr-rosey features.
 - Check whether `git` is installed from the Electron main process.
 - Expose dependency results to the renderer through typed IPC.
 - Render a clean setup/readiness screen with a manual rerun button.
-- Add `AGENTS.md`, `docs/harness.md`, `docs/step-template.md`, `docs/progress.md`, and this step
-  file.
 - Add a short README.
+- Add a minimal docs-based harness.
 
 ## Out Of Scope
 
@@ -38,7 +37,7 @@ needed for future pr-rosey features.
 - The Electron app launches locally.
 - The renderer shows a clean pr-rosey home screen.
 - The UI is styled with Tailwind.
-- The screen clearly communicates that this is the setup/readiness step.
+- The screen clearly communicates that this is the setup/readiness product surface.
 - The app checks whether `gh` is installed.
 - The app checks whether `gh auth status` succeeds.
 - The app checks whether `git` is installed.
@@ -57,10 +56,6 @@ npm run dev
 
 ## Handoff Notes
 
-- Step 1 product behavior is present in the app shell.
-- Harness documentation has moved to `docs/`.
+- Product behavior is present in the app shell.
+- Harness documentation now lives under `docs/`.
 - Future documentation should follow working code, iteration, and verification.
-
-## Approval Checkpoint
-
-Stop after reporting acceptance criteria. Do not continue to Step 2 without explicit human approval.

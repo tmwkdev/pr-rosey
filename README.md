@@ -4,7 +4,7 @@ pr-rosey
 pr-rosey is a local-first Electron desktop app for monitoring the current GitHub user's open pull
 requests and, later, helping prepare prompts when CI fails.
 
-Current status: Step 1 app shell only. The app launches, renders the setup/readiness screen, and
+Current status: app shell and dependency readiness only. The app launches, renders the setup/readiness screen, and
 checks local dependencies. PR fetching is not implemented yet.
 
 Prerequisites:

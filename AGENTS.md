@@ -3,13 +3,13 @@
 ## Project Purpose
 
 pr-rosey is a local-first Electron desktop app for monitoring the current GitHub user's open pull
-requests. Future steps may inspect CI state and generate useful prompts for external AI coding
+requests. Future product work may inspect CI state and generate useful prompts for external AI coding
 agents, but the app must not directly execute coding agents, edit code, commit, push, merge, or use a
 hosted backend.
 
 ## Current Product Boundaries
 
-- Step 1 app shell and dependency readiness only.
+- Current product surface is app shell and dependency readiness only.
 - No PR discovery yet.
 - No GitHub OAuth or hosted auth.
 - No team accounts.
@@ -77,8 +77,8 @@ hierarchy that does not need to exist yet.
 
 ## Testing And Check Expectations
 
-Before reporting a step complete, run `npm run check`. If Electron behavior changed, also launch the
-app with `npm run dev` and verify the relevant screen manually.
+Before reporting product work complete, run `npm run check`. If Electron behavior changed, also
+launch the app with `npm run dev` and verify the relevant screen manually.
 
 ## Harness
 
@@ -88,12 +88,14 @@ Use `docs/harness.md` as the current product-development harness. Product work s
 2. Iteration and verification.
 3. Minimal documentation of what changed and what remains.
 
-Read the current approved step under `docs/steps/` before making product changes. Keep documentation
-thin and practical; do not block useful implementation on speculative docs.
+Use `docs/README.md` as the documentation map. Read any active work item under `docs/plans/active/`
+before making product changes. Keep documentation thin and practical; do not block useful
+implementation on speculative docs.
 
 ## Human In The Loop
 
-This repo is built through approval-gated product increments. Stop after each approved step, report
-the acceptance criteria, and wait for explicit human approval before continuing to future steps.
+This repo is built through approval-gated product increments. Stop after each approved work item,
+report the acceptance criteria, and wait for explicit human approval before continuing to future
+product work.
 
-Agents must not continue to future steps without explicit human approval.
+Agents must not continue to future product work without explicit human approval.
