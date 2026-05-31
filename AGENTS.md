@@ -80,6 +80,17 @@ hierarchy that does not need to exist yet.
 Before reporting a step complete, run `npm run check`. If Electron behavior changed, also launch the
 app with `npm run dev` and verify the relevant screen manually.
 
+## Harness
+
+Use `docs/harness.md` as the current product-development harness. Product work should follow:
+
+1. Working code.
+2. Iteration and verification.
+3. Minimal documentation of what changed and what remains.
+
+Read the current approved step under `docs/steps/` before making product changes. Keep documentation
+thin and practical; do not block useful implementation on speculative docs.
+
 ## Human In The Loop
 
 This repo is built through approval-gated product increments. Stop after each approved step, report

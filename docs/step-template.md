@@ -1,4 +1,4 @@
-# Step N — Title
+# Step N - Title
 
 ## Goal
 
@@ -20,11 +20,19 @@ What the user can do after this step that they could not do before.
 
 - Observable condition that proves the step is complete.
 
-## Validation Commands
+## Validation
 
 ```sh
 npm run check
 ```
+
+Run `npm run dev` too if Electron behavior changed.
+
+## Handoff Notes
+
+- What changed.
+- What was verified.
+- What remains.
 
 ## Approval Checkpoint
 

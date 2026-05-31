@@ -1,4 +1,4 @@
-# Step 1 — App Shell And Agent Harness
+# Step 1 - App Shell And Agent Harness
 
 ## Goal
 
@@ -19,7 +19,8 @@ needed for future pr-rosey features.
 - Check whether `git` is installed from the Electron main process.
 - Expose dependency results to the renderer through typed IPC.
 - Render a clean setup/readiness screen with a manual rerun button.
-- Add `AGENTS.md`, `.codex/README.md`, `.codex/step-template.md`, and this step file.
+- Add `AGENTS.md`, `docs/harness.md`, `docs/step-template.md`, `docs/progress.md`, and this step
+  file.
 - Add a short README.
 
 ## Out Of Scope
@@ -47,12 +48,18 @@ needed for future pr-rosey features.
 - Loading, success, missing, and error states are handled.
 - No PR discovery is implemented.
 
-## Validation Commands
+## Validation
 
 ```sh
 npm run check
 npm run dev
 ```
+
+## Handoff Notes
+
+- Step 1 product behavior is present in the app shell.
+- Harness documentation has moved to `docs/`.
+- Future documentation should follow working code, iteration, and verification.
 
 ## Approval Checkpoint
 
