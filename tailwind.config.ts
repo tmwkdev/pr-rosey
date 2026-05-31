@@ -5,10 +5,14 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#17211b",
-        rosey: "#b84a5a",
-        moss: "#456f5a",
-        paper: "#fbfaf7",
+        ink: "#f4f4f2",
+        muted: "#a7aaa4",
+        faint: "#696d66",
+        rosey: "#e65f73",
+        moss: "#6bd19b",
+        paper: "#0d0f0d",
+        panel: "#151713",
+        line: "#2a2e27",
       },
       fontFamily: {
         sans: [
@@ -22,7 +26,7 @@ export default {
         ],
       },
       boxShadow: {
-        panel: "0 20px 50px rgba(23, 33, 27, 0.12)",
+        panel: "0 20px 70px rgba(0, 0, 0, 0.38)",
       },
     },
   },

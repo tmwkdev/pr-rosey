@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  color: #17211b;
-  background: #fbfaf7;
+  color: #f4f4f2;
+  background: #0d0f0d;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -19,4 +19,9 @@ body {
 
 button {
   font: inherit;
+}
+
+::selection {
+  color: #0d0f0d;
+  background: #6bd19b;
 }

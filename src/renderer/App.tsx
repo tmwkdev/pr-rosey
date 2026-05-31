@@ -25,14 +25,14 @@ function formatCheckedAt(readiness: DependencyReadiness | null): string {
 
 function readinessSummary(dependencies: DependencyCheckResult[]): string {
   if (dependencies.some((dependency) => dependency.status === "loading")) {
-    return "Checking local tools...";
+    return "Checking local tools.";
   }
 
   if (dependencies.every((dependency) => dependency.status === "ready")) {
-    return "Your machine is ready for the next pr-rosey step.";
+    return "Local environment is ready.";
   }
 
-  return "Resolve the items below before using future PR features.";
+  return "Resolve the blocked checks before continuing.";
 }
 
 function App() {
@@ -69,65 +69,128 @@ function App() {
   }, [runDependencyChecks]);
 
   const summary = useMemo(() => readinessSummary(dependencies), [dependencies]);
+  const readyCount = dependencies.filter((dependency) => dependency.status === "ready").length;
+  const issueCount = dependencies.filter((dependency) =>
+    ["missing", "error"].includes(dependency.status),
+  ).length;
 
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <section className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-8 px-6 py-10">
-        <div className="max-w-3xl space-y-4">
-          <p className={tokens.label.eyebrow}>Setup readiness</p>
-          <h1 className="text-5xl font-bold">pr-rosey</h1>
-          <p className="max-w-2xl text-lg leading-8 text-ink/75">
-            A local-first desktop app for watching your GitHub pull requests and preparing useful
-            prompts when CI needs attention.
-          </p>
-        </div>
-
-        <section className={`${tokens.card.panel} overflow-hidden`}>
-          <div className="flex flex-col gap-4 border-ink/10 border-b p-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold">Dependency readiness</h2>
-              <p className="text-sm text-ink/70">{summary}</p>
+      <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-5">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-[#10120f] shadow-panel">
+          <header className="flex items-center justify-between border-line border-b px-5 py-3">
+            <div className="flex items-center gap-3">
+              <div className="grid size-8 place-items-center rounded-md border border-line bg-white/[0.04] text-sm font-semibold">
+                pr
+              </div>
+              <div>
+                <h1 className="font-semibold leading-5">pr-rosey</h1>
+                <p className="text-xs text-muted">Local pull request command center</p>
+              </div>
             </div>
             <button
-              className={tokens.button.primary}
+              className={tokens.button.secondary}
               disabled={isChecking}
               type="button"
               onClick={runDependencyChecks}
             >
-              {isChecking ? "Checking..." : "Rerun checks"}
+              {isChecking ? "Checking" : "Refresh"}
             </button>
-          </div>
+          </header>
 
-          <div className="divide-y divide-ink/10">
-            {dependencies.map((dependency) => (
-              <div
-                className="grid gap-3 p-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                key={dependency.id}
-              >
-                <div className="space-y-1">
-                  <h3 className="font-semibold">{dependency.label}</h3>
-                  <p className="text-sm leading-6 text-ink/70">{dependency.message}</p>
+          <div className="grid min-h-0 flex-1 lg:grid-cols-[18rem_minmax(0,1fr)]">
+            <aside className="border-line border-b bg-white/[0.02] p-5 lg:border-r lg:border-b-0">
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <p className={tokens.label.eyebrow}>Setup readiness</p>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-semibold">Dependency checks</h2>
+                    <p className="text-sm leading-6 text-muted">
+                      pr-rosey keeps system access in Electron and verifies the local tools it will
+                      depend on next.
+                    </p>
+                  </div>
                 </div>
-                <span
-                  className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold ${tokens.status[dependency.status]}`}
-                >
-                  {statusLabels[dependency.status]}
-                </span>
+
+                <div className={`${tokens.card.section} divide-y divide-line`}>
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-sm text-muted">Ready</span>
+                    <span className="font-mono text-sm text-ink">
+                      {readyCount}/{dependencies.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-sm text-muted">Blocked</span>
+                    <span className="font-mono text-sm text-ink">{issueCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-sm text-muted">Last run</span>
+                    <span className="font-mono text-xs text-ink">{formatCheckedAt(readiness)}</span>
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
+            </aside>
 
-          <div className="bg-ink/[0.03] px-6 py-4 text-sm text-ink/60">
-            Last checked: {formatCheckedAt(readiness)}
-          </div>
-        </section>
+            <section className="flex min-h-0 flex-col p-5 sm:p-7">
+              <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="space-y-2">
+                  <p className={tokens.label.eyebrow}>Environment</p>
+                  <h2 className="text-3xl font-semibold">{summary}</h2>
+                </div>
+                <button
+                  className={tokens.button.primary}
+                  disabled={isChecking}
+                  type="button"
+                  onClick={runDependencyChecks}
+                >
+                  {isChecking ? "Running checks" : "Run checks"}
+                </button>
+              </div>
 
-        <section className={`${tokens.card.section} p-5`}>
-          <p className="text-sm leading-6 text-ink/70">
-            Step 1 only verifies local readiness. PR discovery, CI inspection, prompt generation,
-            and agent handoff are intentionally not implemented yet.
-          </p>
-        </section>
+              <div className={`${tokens.card.panel} overflow-hidden`}>
+                <div className="grid grid-cols-[1fr_auto] border-line border-b px-4 py-3 text-xs font-medium uppercase tracking-[0.16em] text-muted">
+                  <span>Dependency</span>
+                  <span>Status</span>
+                </div>
+
+                <div className="divide-y divide-line">
+                  {dependencies.map((dependency) => (
+                    <div
+                      className="grid gap-4 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                      key={dependency.id}
+                    >
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span
+                          aria-hidden="true"
+                          className={`mt-2 size-2 rounded-full ${tokens.statusDot[dependency.status]}`}
+                        />
+                        <div className="min-w-0 space-y-1">
+                          <h3 className="font-medium">{dependency.label}</h3>
+                          <p className="text-sm leading-6 text-muted">{dependency.message}</p>
+                        </div>
+                      </div>
+                      <span
+                        className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${tokens.status[dependency.status]}`}
+                      >
+                        {statusLabels[dependency.status]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-auto pt-5">
+                <section className={`${tokens.card.section} p-4`}>
+                  <p className="text-sm leading-6 text-muted">
+                    Step 1 is limited to app shell and dependency readiness. PR discovery, CI
+                    inspection, prompt generation, and agent handoff remain intentionally out of
+                    scope.
+                  </p>
+                </section>
+              </div>
+            </section>
+          </div>
+        </div>
       </section>
     </main>
   );
