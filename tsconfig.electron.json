@@ -10,9 +10,8 @@
     "forceConsistentCasingInFileNames": true,
     "rootDir": "src",
     "outDir": "dist-electron",
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
     "types": ["node", "electron", "electron-vite/node"]
   },
