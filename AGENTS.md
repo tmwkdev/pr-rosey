@@ -86,11 +86,25 @@ Use `docs/harness.md` as the current product-development harness. Product work s
 
 1. Working code.
 2. Iteration and verification.
-3. Minimal documentation of what changed and what remains.
+3. Independent review by a separate agent.
+4. Minimal documentation of what changed and what remains.
 
 Use `docs/README.md` as the documentation map. Read any active work item under `docs/plans/active/`
 before making product changes. Keep documentation thin and practical; do not block useful
 implementation on speculative docs.
+
+## Agent Skills
+
+Repo-local skills live under `skills/`.
+
+- Implementing agents should use `skills/pr-rosey-implementer/SKILL.md`.
+- Review agents should use `skills/pr-rosey-reviewer/SKILL.md`.
+- If the agent runtime does not auto-discover repo-local skills, read the relevant `SKILL.md`
+  directly before starting.
+- The review gate must be performed by a separate agent from the implementer. The implementing agent
+  can coordinate the review and fix findings, but must not review its own completed chunk.
+- Keep skills concise and Karpathy-style: think before coding, simplicity first, surgical changes,
+  and goal-driven verification.
 
 ## Human In The Loop
 
