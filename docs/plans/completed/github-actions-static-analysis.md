@@ -63,8 +63,8 @@ npm run check
   separate GitHub Actions steps.
 - `npm run check` passed locally after implementation and after the final trigger adjustment.
 - Separate-agent review found no issues after the final PR-only workflow update.
-- Remaining risk: the workflow has not yet been executed on GitHub, and `actionlint` was not run
-  locally.
+- GitHub ran the workflow on PR #3 and `Static Analysis / Lint and typecheck` passed.
+- Remaining risk: `actionlint` was not run locally.
 
 ## Approval Checkpoint
 

@@ -26,10 +26,12 @@
 - Added `.github/workflows/static-analysis.yml` for PR-only static analysis.
 - The workflow uses `actions/checkout@v4`, `actions/setup-node@v4` with Node 24 and npm caching,
   `npm ci`, `npm run lint`, and `npm run typecheck`.
-- Added `docs/plans/active/github-actions-static-analysis.md` as the approved work-item receipt.
+- Moved the approved work-item receipt to
+  `docs/plans/completed/github-actions-static-analysis.md`.
 - Separate-agent review found no issues after removing an extra manual trigger and keeping the
   workflow scoped to pull requests only.
-- The workflow has not yet been executed on GitHub, and `actionlint` was not run locally.
+- GitHub ran the workflow on PR #3 and `Static Analysis / Lint and typecheck` passed.
+- `actionlint` was not run locally.
 - Source imports now use the `@/` alias for app-local modules instead of relative paths.
 - TypeScript, Vite, Electron Vite, and Vitest are configured to resolve `@/` to `src/`.
 - Electron source typechecking now uses TypeScript bundler resolution, matching the electron-vite
@@ -89,6 +91,7 @@
 - For the GitHub Actions static-analysis workflow, `npm run check` passed after implementation and
   after the final PR-only trigger adjustment.
 - Separate-agent review independently ran `npm run check`; Biome, TypeScript, and Vitest passed.
+- GitHub Actions reported success for `Static Analysis / Lint and typecheck` on PR #3.
 - `npm run dev` was not launched for the GitHub Actions workflow because Electron behavior did not
   change.
 - For the latest frontend component cleanup, `npm run format` passed.
