@@ -18,9 +18,20 @@
   checks run, manual Electron verification when relevant, reviewer outcome, and remaining risk.
 - Repo-local agent skills live under `skills/` and separate implementer workflow from reviewer
   workflow.
+- GitHub Actions now includes a minimal pull-request static-analysis workflow that installs with
+  `npm ci` and exposes lint and typecheck as separate CI steps.
 
 ## Latest Handoff
 
+- Added `.github/workflows/static-analysis.yml` for PR-only static analysis.
+- The workflow uses `actions/checkout@v4`, `actions/setup-node@v4` with Node 24 and npm caching,
+  `npm ci`, `npm run lint`, and `npm run typecheck`.
+- Moved the approved work-item receipt to
+  `docs/plans/completed/github-actions-static-analysis.md`.
+- Separate-agent review found no issues after removing an extra manual trigger and keeping the
+  workflow scoped to pull requests only.
+- GitHub ran the workflow on PR #3 and `Static Analysis / Lint and typecheck` passed.
+- `actionlint` was not run locally.
 - Source imports now use the `@/` alias for app-local modules instead of relative paths.
 - TypeScript, Vite, Electron Vite, and Vitest are configured to resolve `@/` to `src/`.
 - Electron source typechecking now uses TypeScript bundler resolution, matching the electron-vite
@@ -77,6 +88,12 @@
 - Separate-agent review independently ran `npm run check`; Biome, TypeScript, and Vitest passed.
 - `npm run dev` was not launched for the latest source-layout harness update because app behavior
   did not change.
+- For the GitHub Actions static-analysis workflow, `npm run check` passed after implementation and
+  after the final PR-only trigger adjustment.
+- Separate-agent review independently ran `npm run check`; Biome, TypeScript, and Vitest passed.
+- GitHub Actions reported success for `Static Analysis / Lint and typecheck` on PR #3.
+- `npm run dev` was not launched for the GitHub Actions workflow because Electron behavior did not
+  change.
 - For the latest frontend component cleanup, `npm run format` passed.
 - For the latest frontend component cleanup, `npm run check` passed.
 - For the latest frontend component cleanup, `npm run dev` launched the Electron dev server/app
