@@ -11,6 +11,7 @@ the next agent or human who needs to make a product change.
 - `progress.md` - latest handoff state and verification notes
 - `plans/` - active and completed work items
 - `plan-template.md` - template for approved work items
+- `../skills/` - repo-local implementer and reviewer skills for agent workflow
 
 ## Documentation Bias
 

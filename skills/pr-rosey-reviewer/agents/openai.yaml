@@ -1,0 +1,4 @@
+interface:
+  display_name: "pr-rosey Reviewer"
+  short_description: "Independently review completed pr-rosey implementation chunks."
+  default_prompt: "Use this skill to review a completed pr-rosey implementation chunk before it is reported complete."

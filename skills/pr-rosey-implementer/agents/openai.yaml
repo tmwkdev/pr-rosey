@@ -1,0 +1,4 @@
+interface:
+  display_name: "pr-rosey Implementer"
+  short_description: "Implement approved pr-rosey work in small verified chunks."
+  default_prompt: "Use this skill when implementing approved pr-rosey product or harness work."
