@@ -23,6 +23,16 @@
 
 ## Latest Handoff
 
+- TypeScript checking now uses the TS 7 native preview path through
+  `@typescript/native-preview@7.0.0-dev.20260527.2`.
+- The old `typescript` dev dependency was removed, and `npm run typecheck` now runs `tsgo --noEmit`
+  against both `tsconfig.json` and `tsconfig.electron.json`.
+- TypeScript configs were updated for TS 7 compatibility by removing `baseUrl` and making the `@/`
+  path alias target explicitly relative as `./src/*`.
+- `npm ls @typescript/native-preview --depth=0` reports
+  `@typescript/native-preview@7.0.0-dev.20260527.2`; `npm ls typescript --depth=0` reports no
+  installed `typescript` package.
+- Separate-agent review found no issues with the TS 7 native preview upgrade.
 - Added `.github/workflows/static-analysis.yml` for PR-only static analysis.
 - The workflow uses `actions/checkout@v4`, `actions/setup-node@v4` with Node 24 and npm caching,
   `npm ci`, `npm run lint`, and `npm run typecheck`.
@@ -75,6 +85,11 @@
 
 ## Verification
 
+- For the TS 7 native preview upgrade, `npm run typecheck` passed with `tsgo`.
+- For the TS 7 native preview upgrade, `npm run check` passed.
+- For the TS 7 native preview upgrade, `npm run build` passed.
+- For the TS 7 native preview upgrade, `npm run dev` launched the Electron dev server/app without
+  terminal runtime errors; it was then stopped with Ctrl-C.
 - For the absolute-import cleanup, `npm run format`, `npm run check`, and `npm run build` passed.
 - For the absolute-import cleanup, `npm run dev` built Electron main/preload, started the renderer
   dev server on `http://localhost:5173/`, and reached Electron app startup before being stopped.
