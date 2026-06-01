@@ -24,7 +24,9 @@ pr-rosey uses a boring Electron split with explicit ownership boundaries.
 2. Preload invokes the typed `dependencies:check` IPC channel.
 3. Main process handles the request and runs dependency checks.
 4. Main process returns serializable readiness results to the renderer.
-5. Renderer asks `window.prRosey.pullRequests.fetchAuthoredOpen()` for the current PR list.
+5. Renderer asks `window.prRosey.pullRequests.fetchAuthoredOpen()` for the current PR list and CI
+   status rollups.
 6. Main process identifies the authenticated GitHub user through `gh api user`.
-7. Main process queries GitHub through `gh api graphql` and returns serializable PR summaries.
+7. Main process queries GitHub through `gh api graphql`, reads each PR head commit status-check
+   rollup, and returns serializable PR summaries.
 8. Renderer asks `window.prRosey.pullRequests.openUrl(url)` when the user opens a PR.

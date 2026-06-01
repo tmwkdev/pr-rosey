@@ -1,4 +1,10 @@
-import type { PullRequestDiscovery, PullRequestSummary } from "@/shared/pullRequests";
+import {
+  ciStatusLabels,
+  formatCiStatusSummary,
+  type PullRequestCiStatus,
+  type PullRequestDiscovery,
+  type PullRequestSummary,
+} from "@/shared/pullRequests";
 import { tokens } from "@/styles/tokens";
 
 function formatTimestamp(timestamp: string): string {
@@ -115,7 +121,7 @@ function PullRequestList({
     <div className={`${tokens.card.panel} min-h-0 overflow-hidden`}>
       <div className="grid grid-cols-[1fr_auto] border-line border-b px-4 py-3 text-xs font-medium uppercase tracking-[0.16em] text-muted">
         <span>Pull request</span>
-        <span>Status</span>
+        <span>CI</span>
       </div>
 
       {isInitialLoading ? (
@@ -161,7 +167,7 @@ interface PullRequestRowProps {
 
 function PullRequestRow({ isOpening, pullRequest, onOpenPullRequest }: PullRequestRowProps) {
   return (
-    <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(9rem,12rem)_auto_auto] lg:items-center">
+    <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(9rem,12rem)_auto_minmax(10rem,13rem)_auto] lg:items-center">
       <div className={tokens.layout.detailStack}>
         <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">
           {pullRequest.repository.nameWithOwner}
@@ -180,6 +186,8 @@ function PullRequestRow({ isOpening, pullRequest, onOpenPullRequest }: PullReque
       </div>
 
       <PullRequestStatusBadge isDraft={pullRequest.isDraft} />
+
+      <PullRequestCiStatusBadge status={pullRequest.ciStatus} />
 
       <button
         className={tokens.button.secondary}
@@ -213,6 +221,49 @@ function PullRequestStatusBadge({ isDraft }: PullRequestStatusBadgeProps) {
   );
 }
 
+interface PullRequestCiStatusProps {
+  status: PullRequestCiStatus;
+}
+
+function PullRequestCiStatusBadge({ status }: PullRequestCiStatusProps) {
+  const statusClassName = getCiStatusClassName(status.state);
+  const visibleChecks = status.checks
+    .filter((check) => check.state === "failing" || check.state === "pending")
+    .slice(0, 2);
+
+  return (
+    <div className={tokens.layout.detailStack}>
+      <span
+        className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusClassName}`}
+      >
+        {ciStatusLabels[status.state]}
+      </span>
+      <p className={tokens.text.meta}>{formatCiStatusSummary(status)}</p>
+      {visibleChecks.length > 0 ? (
+        <p className="truncate text-xs text-muted">
+          {visibleChecks.map((check) => check.name).join(", ")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function getCiStatusClassName(status: PullRequestCiStatus["state"]): string {
+  switch (status) {
+    case "passing":
+      return tokens.status.ready;
+    case "failing":
+      return tokens.status.missing;
+    case "pending":
+      return tokens.status.loading;
+    case "error":
+      return tokens.status.error;
+    case "no-checks":
+    case "unknown":
+      return tokens.status.unknown;
+  }
+}
+
 interface ReadinessFooterProps {
   checkedAt: string;
   summary: string;
@@ -225,9 +276,7 @@ function ReadinessFooter({ checkedAt, summary }: ReadinessFooterProps) {
         <div
           className={`grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center ${tokens.text.mutedBody}`}
         >
-          <p>
-            {summary} CI status, polling, prompt generation, and agent handoff remain out of scope.
-          </p>
+          <p>{summary} Polling, prompt generation, and agent handoff remain out of scope.</p>
           <span className="font-mono text-xs">Last check: {checkedAt}</span>
         </div>
       </section>

@@ -2,14 +2,14 @@
 
 ## Current State
 
-- App shell, dependency readiness, and authored open PR display are the current implemented product
-  scope.
+- App shell, dependency readiness, authored open PR display, and CI status rollups are the current
+  implemented product scope.
 - The app checks local `gh`, `gh auth status`, and `git` readiness from the Electron main process.
 - The app identifies the authenticated `gh` user, fetches authored open PRs through GitHub GraphQL
-  search, includes draft PRs, and displays repository, title, number, URL, draft status, source
-  branch, and updated timestamp.
+  search, includes draft PRs, reads each head commit status-check rollup, and displays repository,
+  title, number, URL, draft status, source branch, updated timestamp, and CI state.
 - Results flow to the renderer through the typed preload IPC boundary.
-- CI inspection, prompt generation, GitHub OAuth, hosted services, team accounts, and direct
+- Background CI polling, prompt generation, GitHub OAuth, hosted services, team accounts, and direct
   AI-agent execution remain out of scope.
 - The harness now requires a separate reviewer agent after each completed implementation chunk.
 - The harness now names pre-flight, revision, escalation, and abort gates so future workflow changes
@@ -23,6 +23,20 @@
 
 ## Latest Handoff
 
+- CI status rollups were added to authored open PR discovery on branch `ci-status-rollup`.
+- The main process now requests each PR head commit `statusCheckRollup` through `gh api graphql` and
+  normalizes GitHub check runs/status contexts into serializable shared CI status types.
+- The renderer PR list now shows CI badges for passing, failing, pending, error, no-checks, and
+  unknown states, with count summaries and first actionable check names.
+- Shared CI summary formatting is covered by `src/shared/pullRequests.test.ts`.
+- Product docs now list CI status rollups as current product surface while leaving background
+  polling and notifications out of scope.
+- Completed work-item receipt lives at `docs/plans/completed/ci-status-rollup.md`.
+- Feature PR #5 is open for dogfooding: https://github.com/tmwkdev/pr-rosey/pull/5.
+- Intentional failing PR #6 is open for failure-state dogfooding:
+  https://github.com/tmwkdev/pr-rosey/pull/6.
+- GitHub Actions reported PR #5 passing and PR #6 failing `Lint and typecheck`.
+- Separate-agent review found no issues and independently ran `npm run check`.
 - TypeScript checking now uses the TS 7 native preview path through
   `@typescript/native-preview@7.0.0-dev.20260527.2`.
 - The old `typescript` dev dependency was removed, and `npm run typecheck` now runs `tsgo --noEmit`
@@ -85,6 +99,20 @@
 
 ## Verification
 
+- For the CI status rollup feature, `npm test -- --run src/shared/pullRequests.test.ts` passed.
+- For the CI status rollup feature, `npm run typecheck` passed.
+- For the CI status rollup feature, `npm run check` passed.
+- For the CI status rollup feature, a direct `gh api graphql` smoke check accepted the
+  status-check-rollup query and returned CI data for prior repo PRs.
+- For dogfooding, `gh pr checks 5 --watch=false` reported `Lint and typecheck` passing.
+- For dogfooding, `gh pr checks 6 --watch --interval 10` reported `Lint and typecheck` failing from
+  the intentional TypeScript error.
+- For the CI status rollup feature, `npm run dev` built and launched Electron from the feature
+  branch before and after opening dogfood PRs; it was stopped with Ctrl-C both times.
+- Separate-agent review independently ran `npm run check`; Biome, TypeScript, and Vitest passed.
+- Electron UI verification for the CI status rollup feature remains limited to terminal-level app
+  smoke launches plus live GitHub check-rollup data; no automated Electron window screenshot was
+  captured.
 - For the TS 7 native preview upgrade, `npm run typecheck` passed with `tsgo`.
 - For the TS 7 native preview upgrade, `npm run check` passed.
 - For the TS 7 native preview upgrade, `npm run build` passed.
