@@ -79,6 +79,54 @@ Before calling product work complete, confirm:
 - A separate reviewer agent reviewed the completed chunk, or the lack of review is explicitly
   reported as a blocker.
 
+## Source Layout
+
+Use Electron's process model as the first organizing rule, then use React feature boundaries inside
+the renderer as the app grows.
+
+- Keep `src/main/index.ts` focused on Electron lifecycle, window creation, and handler registration.
+  Move local system access, GitHub CLI calls, and other Node/Electron work into small main-process
+  service modules under `src/main/`.
+- Keep `src/preload/index.ts` as the narrow bridge. Expose one typed method per IPC operation and do
+  not expose raw `ipcRenderer`, broad channel senders, Node modules, or main-process services to the
+  renderer.
+- Keep `src/shared/` for serializable IPC contracts, domain types, and pure helpers that are safe to
+  import from main, preload, renderer, and tests. Shared files must not import from `src/main/`,
+  `src/preload/`, or `src/renderer/`.
+- Keep `src/renderer/main.tsx` as React bootstrapping only. Keep `src/renderer/App.tsx` as
+  composition for the current single-window experience until named regions, state, or reuse make a
+  split clearer.
+- When renderer code outgrows one file, prefer feature folders such as
+  `src/renderer/features/pull-requests/` or `src/renderer/features/readiness/` that co-locate the
+  feature's component, hooks, helpers, and tests. Do not create broad `components/`, `hooks/`, or
+  `utils/` folders before there is real cross-feature reuse.
+- Put truly shared renderer UI in `src/renderer/components/` only after at least two features need
+  the same behavior-rich component. Styling-only reuse belongs in `src/styles/tokens.ts`.
+- Keep global renderer CSS in `src/renderer/styles.css`; keep shared Tailwind class tokens in
+  `src/styles/tokens.ts`.
+- Co-locate tests with the module or feature they verify when that keeps ownership obvious. Use
+  `src/shared/*.test.ts` for pure shared helpers and renderer-feature tests beside their feature
+  once renderer behavior needs tests.
+
+## File Boundaries
+
+File boundaries should improve ownership and scanability; one component per file is not a rule.
+
+- A file should have one clear public responsibility. Prefer one exported component, hook, service,
+  or type group per file when other modules import it.
+- Small private helper components can stay in the parent file when they are tightly coupled and only
+  used there. Move them out when the parent becomes hard to scan, the child has meaningful local
+  state, or another feature needs it.
+- Use named files that match the exported responsibility, such as `PullRequestList.tsx`,
+  `usePullRequests.ts`, or `pullRequestService.ts`.
+- Avoid barrel `index.ts` files until imports become noisy enough to justify them. Barrels should
+  preserve ownership clarity and must not hide cross-boundary imports.
+- Do not split a cohesive module just to reduce line count, and do not merge unrelated concerns just
+  because they are small.
+- Keep imports directional: `main`, `preload`, and `renderer` may import from `shared`; `renderer`
+  may import from `styles`; `shared` imports from no app layer; `renderer` never imports Electron,
+  Node system modules, `src/main/`, or `src/preload/`.
+
 ## Frontend Practices
 
 Renderer work should keep React, TypeScript, and Tailwind code readable without turning the app into

@@ -40,9 +40,25 @@
 - `docs/harness.md` now includes persisted frontend practices for component decomposition, local
   state, typed shared models, token-first Tailwind usage, and dependency discipline as `App.tsx`
   grows.
+- `docs/harness.md` now includes Electron/React source-layout guidance: process-first Electron
+  folders, a narrow typed preload bridge, safe shared contracts, feature-co-located renderer growth,
+  pragmatic component file boundaries, and directional import rules.
+- Separate-agent review found no issues with the source-layout harness update.
+- The renderer source-layout refactor moved dependency readiness and authored PR UI/state into
+  feature folders while keeping `App.tsx` as the single-window composition layer.
+- Separate-agent review found no issues with the renderer source-layout refactor.
 
 ## Verification
 
+- For the latest renderer source-layout refactor, the implementer ran `npm run format`,
+  `npm run check`, and a terminal-level `npm run dev` Electron smoke launch.
+- Separate-agent review independently ran `npm run check`; Biome, TypeScript, and Vitest passed.
+- Electron UI verification for the latest renderer source-layout refactor remains limited to the
+  implementer's terminal-level smoke launch; no browser automation was run for the Electron window.
+- For the latest source-layout harness update, `npm run check` passed.
+- Separate-agent review independently ran `npm run check`; Biome, TypeScript, and Vitest passed.
+- `npm run dev` was not launched for the latest source-layout harness update because app behavior
+  did not change.
 - For the latest frontend component cleanup, `npm run format` passed.
 - For the latest frontend component cleanup, `npm run check` passed.
 - For the latest frontend component cleanup, `npm run dev` launched the Electron dev server/app
