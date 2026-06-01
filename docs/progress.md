@@ -1,5 +1,14 @@
 # Progress
 
+## Native App UI Refresh
+
+- Approved scope: chat-approved renderer UI update to make the Electron app feel like a native full-window app instead of a website-style page with sidebars.
+- Changed: replaced the top-level web-page container with a full-viewport desktop shell, moved readiness from `ReadinessSidebar` into an inline `ReadinessPanel`, reshaped authored PRs into a window-filling table/list, and hid body overflow for the Electron window.
+- Files changed: `src/renderer/App.tsx`, `src/renderer/features/readiness/ReadinessPanel.tsx`, `src/renderer/features/readiness/ReadinessSidebar.tsx`, `src/renderer/features/pull-requests/PullRequestsPanel.tsx`, and `src/renderer/styles.css`.
+- Verification: `npm run check` passed; `npm run build` passed; `npm run dev` started the Electron/Vite dev server and `http://localhost:5173/` returned 200 before shutdown.
+- Review: separate reviewer agent found no renderer bugs, product-boundary violations, or token-rule regressions. Reviewer noted no active plan file; this increment was approved directly in chat. Reviewer also noted unrelated `AGENTS.md` changes in the worktree, which are excluded from this UI commit.
+- Remaining risk: no in-app Browser screenshot was captured because the Browser plugin reported `iab` unavailable in this session.
+
 ## Current State
 
 - App shell, dependency readiness, authored open PR display, and CI status rollups are the current
