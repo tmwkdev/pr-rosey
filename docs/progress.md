@@ -17,6 +17,10 @@
 
 ## Latest Handoff
 
+- Source imports now use the `@/` alias for app-local modules instead of relative paths.
+- TypeScript, Vite, Electron Vite, and Vitest are configured to resolve `@/` to `src/`.
+- Electron source typechecking now uses TypeScript bundler resolution, matching the electron-vite
+  build path for bundled main and preload code.
 - `src/renderer/App.tsx` was reorganized into named in-file regions for the app header, readiness
   sidebar, PR panel, PR list rows, error/empty states, and readiness footer while preserving the
   existing renderer behavior.
@@ -50,6 +54,10 @@
 
 ## Verification
 
+- For the absolute-import cleanup, `npm run format`, `npm run check`, and `npm run build` passed.
+- For the absolute-import cleanup, `npm run dev` built Electron main/preload, started the renderer
+  dev server on `http://localhost:5173/`, and reached Electron app startup before being stopped.
+- Separate-agent review was not run for the absolute-import cleanup in this turn.
 - For the latest renderer source-layout refactor, the implementer ran `npm run format`,
   `npm run check`, and a terminal-level `npm run dev` Electron smoke launch.
 - Separate-agent review independently ran `npm run check`; Biome, TypeScript, and Vitest passed.

@@ -1,5 +1,5 @@
-import type { DependencyReadiness } from "./dependencies.js";
-import type { PullRequestDiscovery } from "./pullRequests.js";
+import type { DependencyReadiness } from "@/shared/dependencies";
+import type { PullRequestDiscovery } from "@/shared/pullRequests";
 
 export const ipcChannels = {
   checkDependencies: "dependencies:check",

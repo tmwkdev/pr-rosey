@@ -5,7 +5,7 @@ import {
   type DependencyCheckResult,
   type DependencyReadiness,
   dependencyIds,
-} from "../../../shared/dependencies";
+} from "@/shared/dependencies";
 
 const initialDependencies = dependencyIds.map((id) => createUnknownDependency(id));
 

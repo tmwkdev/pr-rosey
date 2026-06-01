@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLoadingDependencies, dependencyIds, statusLabels } from "./dependencies.js";
+import { createLoadingDependencies, dependencyIds, statusLabels } from "@/shared/dependencies";
 
 describe("dependency shared types", () => {
   it("creates a loading row for every dependency", () => {

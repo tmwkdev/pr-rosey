@@ -1,5 +1,5 @@
-import type { PullRequestDiscovery, PullRequestSummary } from "../../../shared/pullRequests";
-import { tokens } from "../../../styles/tokens";
+import type { PullRequestDiscovery, PullRequestSummary } from "@/shared/pullRequests";
+import { tokens } from "@/styles/tokens";
 
 function formatTimestamp(timestamp: string): string {
   return new Intl.DateTimeFormat(undefined, {

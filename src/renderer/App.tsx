@@ -1,8 +1,8 @@
-import { tokens } from "../styles/tokens";
-import { PullRequestsPanel } from "./features/pull-requests/PullRequestsPanel";
-import { useAuthoredPullRequests } from "./features/pull-requests/useAuthoredPullRequests";
-import { ReadinessSidebar } from "./features/readiness/ReadinessSidebar";
-import { useDependencyReadiness } from "./features/readiness/useDependencyReadiness";
+import { PullRequestsPanel } from "@/renderer/features/pull-requests/PullRequestsPanel";
+import { useAuthoredPullRequests } from "@/renderer/features/pull-requests/useAuthoredPullRequests";
+import { ReadinessSidebar } from "@/renderer/features/readiness/ReadinessSidebar";
+import { useDependencyReadiness } from "@/renderer/features/readiness/useDependencyReadiness";
+import { tokens } from "@/styles/tokens";
 
 interface AppHeaderProps {
   isRefreshingPullRequests: boolean;

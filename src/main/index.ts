@@ -1,9 +1,9 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain, shell } from "electron";
-import { ipcChannels } from "../shared/ipc.js";
-import { checkDependencies } from "./dependencyCheckService.js";
-import { fetchAuthoredOpenPullRequests } from "./pullRequestService.js";
+import { checkDependencies } from "@/main/dependencyCheckService";
+import { fetchAuthoredOpenPullRequests } from "@/main/pullRequestService";
+import { ipcChannels } from "@/shared/ipc";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

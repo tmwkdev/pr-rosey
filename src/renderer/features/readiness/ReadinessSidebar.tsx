@@ -1,5 +1,5 @@
-import type { DependencyCheckResult } from "../../../shared/dependencies";
-import { tokens } from "../../../styles/tokens";
+import type { DependencyCheckResult } from "@/shared/dependencies";
+import { tokens } from "@/styles/tokens";
 
 interface ReadinessSidebarProps {
   checkedAt: string;

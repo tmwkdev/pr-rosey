@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { PullRequestDiscovery, PullRequestSummary } from "../../../shared/pullRequests";
+import type { PullRequestDiscovery, PullRequestSummary } from "@/shared/pullRequests";
 
 export function useAuthoredPullRequests() {
   const [discovery, setDiscovery] = useState<PullRequestDiscovery | null>(null);

@@ -1,10 +1,10 @@
+import { runShellCommand, type ShellCommandError } from "@/main/shellCommand";
 import type {
   DependencyCheckResult,
   DependencyId,
   DependencyReadiness,
-} from "../shared/dependencies.js";
-import { dependencyLabels } from "../shared/dependencies.js";
-import { runShellCommand, type ShellCommandError } from "./shellCommand.js";
+} from "@/shared/dependencies";
+import { dependencyLabels } from "@/shared/dependencies";
 
 function isMissingCommand(error: ShellCommandError): boolean {
   return error.code === "ENOENT";

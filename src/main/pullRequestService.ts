@@ -1,5 +1,5 @@
-import type { PullRequestDiscovery, PullRequestSummary } from "../shared/pullRequests.js";
-import { runShellCommand, type ShellCommandError } from "./shellCommand.js";
+import { runShellCommand, type ShellCommandError } from "@/main/shellCommand";
+import type { PullRequestDiscovery, PullRequestSummary } from "@/shared/pullRequests";
 
 const pageSize = 100;
 const maxPages = 10;

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { ipcChannels, type PrRoseyApi } from "../shared/ipc.js";
+import { ipcChannels, type PrRoseyApi } from "@/shared/ipc";
 
 const api: PrRoseyApi = {
   dependencies: {
