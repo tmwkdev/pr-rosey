@@ -79,6 +79,36 @@ Before calling product work complete, confirm:
 - A separate reviewer agent reviewed the completed chunk, or the lack of review is explicitly
   reported as a blocker.
 
+## Frontend Practices
+
+Renderer work should keep React, TypeScript, and Tailwind code readable without turning the app into
+a speculative component system.
+
+- Keep `App.tsx` focused on app composition. Extract a chunk when it has meaningful local state, is
+  reused, represents a named UI region, or makes the parent materially easier to scan.
+- Do not split components just to reduce line count. A cohesive 60-line component is better than a
+  stack of tiny wrappers with prop threading and unclear ownership.
+- Prefer co-location. If a child is only used by one parent, keep it in the same file until size,
+  state, or behavior makes a separate file clearer.
+- Reuse `src/styles/tokens.ts` before writing Tailwind classes on primitive elements. Add a token
+  only when the same primitive class string repeats for the same purpose.
+- Do not create components whose only job is styling a single HTML element. Use tokens for styling;
+  use components for behavior, state, reuse, or named UI structure.
+- Keep state as local as possible. Lift state only when siblings need it, and avoid global stores
+  until there is a clear cross-cutting concern that ordinary props cannot reasonably handle.
+- Model async work with explicit loading, error, and data states. Prefer early returns over deeply
+  nested JSX conditionals.
+- Use `interface` for object shapes and `type` for unions or aliases. Avoid `any`; move shared types
+  to a shared file instead of duplicating them across modules.
+- Add libraries only when they remove real complexity or cover important edge cases. Good examples
+  are `date-fns` for date formatting, `clsx` or a `cn()` helper for class composition, accessible UI
+  primitives for dialogs/dropdowns/tooltips, and TanStack Query only if async state becomes complex
+  enough to warrant it.
+- Prefer a small hook or helper over a dependency when React, Tailwind, TypeScript, or vanilla JS
+  already solves the problem cleanly.
+- Avoid speculative abstractions, unrelated concerns in one component, hand-rolled replacements for
+  proven libraries, and comments that restate obvious code.
+
 ## Documentation Standard
 
 Documentation should be short and executable enough to help the next agent. Prefer:

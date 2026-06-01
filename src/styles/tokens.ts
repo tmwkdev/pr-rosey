@@ -13,6 +13,18 @@ export const tokens = {
     eyebrow: "text-[11px] font-semibold uppercase tracking-[0.18em] text-muted",
     field: "text-sm font-medium text-ink",
   },
+  layout: {
+    detailStack: "min-w-0 space-y-1",
+  },
+  stat: {
+    row: "flex items-center justify-between px-4 py-3",
+    label: "text-sm text-muted",
+    value: "font-mono text-sm text-ink",
+  },
+  text: {
+    meta: "text-xs text-muted",
+    mutedBody: "text-sm leading-6 text-muted",
+  },
   input: {
     base: "min-h-9 rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink shadow-sm shadow-black/20 focus:border-moss focus:outline-none focus:ring-2 focus:ring-moss/25",
   },

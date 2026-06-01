@@ -49,13 +49,11 @@ equivalent classes.
 
 ### When To Create A Component
 
-Only extract a new component if both are true:
+Extract a component when it has meaningful local state, is reused, represents a named UI region, or
+makes the parent materially easier to scan.
 
-1. It is used in more than one place.
-2. It encapsulates behavior, not just styling.
-
-If something is only styled, use a token. If something is only used once, keep it inline. Do not
-create wrapper components that only apply CSS.
+Do not split components just to split them. If something is only styled, use a token. Do not create
+wrapper components that only apply CSS.
 
 ### When To Add A New Token
 
@@ -66,7 +64,8 @@ If the same Tailwind class string appears more than once for the same element ty
 
 - Do not add new dependencies to add UI components.
 - Do not create a token for a one-off style.
-- Do not create a component file for something used in one place.
+- Do not create a component file for something used in one place unless size, state, or behavior
+  makes that file boundary clearer.
 - Do not restyle an existing primitive element in a way that diverges from its token without
   flagging it as a deliberate deviation.
 

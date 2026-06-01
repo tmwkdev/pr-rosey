@@ -17,6 +17,13 @@
 
 ## Latest Handoff
 
+- `src/renderer/App.tsx` was reorganized into named in-file regions for the app header, readiness
+  sidebar, PR panel, PR list rows, error/empty states, and readiness footer while preserving the
+  existing renderer behavior.
+- `src/styles/tokens.ts` now includes repeated text, stat-row, and detail-stack tokens used by the
+  renderer cleanup; one-off styles remain inline per the frontend guidance.
+- Separate-agent review found one low tokenization issue around one-off tokens; those tokens were
+  removed and the styles were inlined.
 - Step 2 implemented authored open PR discovery using `gh api user` followed by paginated
   `gh api graphql` search for `is:pr is:open author:<login> sort:updated-desc`.
 - Manual PR refresh and PR URL browser handoff are exposed through the typed preload IPC API.
@@ -30,10 +37,18 @@
 - The harness explicitly prefers working code, iteration, and verification before documentation.
 - Agent workflow now follows a Karpathy-style setup: think before coding, simplicity first, surgical
   changes, and goal-driven verification.
+- `docs/harness.md` now includes persisted frontend practices for component decomposition, local
+  state, typed shared models, token-first Tailwind usage, and dependency discipline as `App.tsx`
+  grows.
 
 ## Verification
 
-- `gh api user --jq .login` returned the authenticated GitHub login.
-- The GraphQL search command returned a valid search response.
-- `npm run check` passed.
-- `npm run dev` launched the Electron app without terminal runtime errors.
+- For the latest frontend component cleanup, `npm run format` passed.
+- For the latest frontend component cleanup, `npm run check` passed.
+- For the latest frontend component cleanup, `npm run dev` launched the Electron dev server/app
+  without terminal runtime errors; it was then stopped with Ctrl-C.
+- For the latest documentation-only harness update, `npm run format` passed.
+- For the latest documentation-only harness update, `npm run check` passed.
+- `npm run dev` was not launched for the latest update because app behavior did not change.
+- Prior product verification included `gh api user --jq .login`, a valid GraphQL search response,
+  `npm run check`, and `npm run dev` launching the Electron app without terminal runtime errors.
