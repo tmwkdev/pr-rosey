@@ -12,6 +12,10 @@
 - CI inspection, prompt generation, GitHub OAuth, hosted services, team accounts, and direct
   AI-agent execution remain out of scope.
 - The harness now requires a separate reviewer agent after each completed implementation chunk.
+- The harness now names pre-flight, revision, escalation, and abort gates so future workflow changes
+  can describe failure behavior without adding orchestration machinery.
+- Completed work now leaves a compact receipt in `docs/progress.md`: approved scope, files changed,
+  checks run, manual Electron verification when relevant, reviewer outcome, and remaining risk.
 - Repo-local agent skills live under `skills/` and separate implementer workflow from reviewer
   workflow.
 
@@ -51,6 +55,12 @@
 - The renderer source-layout refactor moved dependency readiness and authored PR UI/state into
   feature folders while keeping `App.tsx` as the single-window composition layer.
 - Separate-agent review found no issues with the renderer source-layout refactor.
+- Harness research against Hermes Agent, OpenClaw, and Awesome Harness Engineering reinforced the
+  current direction: compact root policy, focused docs, small skills, explicit gates, proof-first
+  validation, and no durable autonomy runtime before an approved work item.
+- `docs/harness.md` now includes harness gate vocabulary and an autonomy-readiness section.
+- `docs/plan-template.md` now asks each future work item to name touched surfaces, capability
+  budget, and autonomy impact before implementation starts.
 
 ## Verification
 

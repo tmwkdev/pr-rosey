@@ -53,6 +53,29 @@ For each approved work item:
    the separate-agent review.
 7. Update `docs/progress.md` with what changed, what passed, review outcome, and what remains.
 
+For the handoff note, leave a compact work receipt instead of a long narrative: approved scope,
+files changed, checks run, manual Electron verification when relevant, reviewer outcome, and
+remaining risk.
+
+## Harness Gates
+
+Use the same small gate vocabulary for every workflow. The vocabulary matters more than the amount
+of process: it makes failure behavior explicit without adding a runtime orchestrator.
+
+- Pre-flight gate: blocks work before edits when approval, scope, dependencies, or local context are
+  missing. Fix the precondition, then restart from the beginning of the work item.
+- Revision gate: loops a completed artifact back for targeted fixes, usually from tests or a
+  separate reviewer. Keep the loop bounded; if the same issue does not improve, escalate.
+- Escalation gate: pauses for a human decision when requirements conflict, scope is ambiguous, or
+  the next step would cross a product boundary.
+- Abort gate: stops work to avoid damage or wasted effort when a safety invariant, environment, or
+  verification path is broken.
+
+Every active plan should make the important gates obvious through acceptance criteria, out-of-scope
+items, touched surfaces, and validation steps. Do not add queue runners, cron jobs, autonomous
+campaigns, or harness-evolution loops until a future approved work item explicitly asks for that
+runtime behavior.
+
 ## Agent Skills
 
 This repo uses a lightweight Karpathy-style skills setup: concise role files that load only when
@@ -156,6 +179,28 @@ a speculative component system.
   already solves the problem cleanly.
 - Avoid speculative abstractions, unrelated concerns in one component, hand-rolled replacements for
   proven libraries, and comments that restate obvious code.
+
+## Autonomy Readiness
+
+pr-rosey should be easy to evolve toward more autonomous workflows later, but the current harness is
+human-approved and single-work-item oriented. The foundation to preserve is:
+
+- A compact root `AGENTS.md` for hard policy and routing.
+- Focused docs for product boundaries, architecture, plans, progress, and the harness.
+- Small repo-local skills for implementer and reviewer roles.
+- Work items that name scope, non-goals, touched surfaces, acceptance criteria, validation, and
+  handoff notes.
+- Capability budgets for work that touches local system access, GitHub CLI calls, IPC, or future
+  agent workflow behavior.
+- Typed Electron boundaries that keep local system access in main, UI in renderer, and serializable
+  contracts in shared code.
+- Proof-first closeout: targeted checks while iterating, `npm run check`, Electron manual
+  verification when behavior changes, and separate-agent review.
+
+Do not treat autonomy as a feature until it is explicitly approved. Before adding any durable agent
+runtime, queue, scheduler, memory store, auto-review loop, or self-improving harness behavior, write
+an active plan that states the user value, safety boundary, recovery path, and validation approach.
+Prefer a disposable spike first when the implementation risk is unclear.
 
 ## Documentation Standard
 
