@@ -1,5 +1,12 @@
 import { runShellCommand, type ShellCommandError } from "@/main/shellCommand";
-import type { PullRequestDiscovery, PullRequestSummary } from "@/shared/pullRequests";
+import type {
+  PullRequestCiCheck,
+  PullRequestCiCheckState,
+  PullRequestCiStatus,
+  PullRequestCiStatusState,
+  PullRequestDiscovery,
+  PullRequestSummary,
+} from "@/shared/pullRequests";
 
 const pageSize = 100;
 const maxPages = 10;
@@ -27,6 +34,33 @@ query($searchQuery: String!, $first: Int!, $cursor: String) {
         isDraft
         headRefName
         updatedAt
+        commits(last: 1) {
+          nodes {
+            commit {
+              oid
+              statusCheckRollup {
+                state
+                contexts(first: 100) {
+                  totalCount
+                  nodes {
+                    __typename
+                    ... on CheckRun {
+                      name
+                      status
+                      conclusion
+                      detailsUrl
+                    }
+                    ... on StatusContext {
+                      context
+                      state
+                      targetUrl
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -47,6 +81,9 @@ type GraphQlPullRequestNode = {
   isDraft?: unknown;
   headRefName?: unknown;
   updatedAt?: unknown;
+  commits?: {
+    nodes?: unknown;
+  };
 };
 
 type GraphQlSearchResponse = {
@@ -77,6 +114,202 @@ function parseJson<T>(raw: string, errorMessage: string): T {
   } catch {
     throw new Error(errorMessage);
   }
+}
+
+function createEmptyCiStatus(
+  state: PullRequestCiStatusState,
+  commitOid: string | null,
+): PullRequestCiStatus {
+  return {
+    state,
+    commitOid,
+    totalCount: 0,
+    passingCount: 0,
+    failingCount: 0,
+    pendingCount: 0,
+    skippedCount: 0,
+    unknownCount: 0,
+    checks: [],
+    isIncomplete: false,
+  };
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function toCheckRunState(status: unknown, conclusion: unknown): PullRequestCiCheckState {
+  if (typeof status === "string" && status !== "COMPLETED") {
+    return "pending";
+  }
+
+  switch (conclusion) {
+    case "SUCCESS":
+      return "passing";
+    case "NEUTRAL":
+    case "SKIPPED":
+      return "skipped";
+    case "ACTION_REQUIRED":
+    case "CANCELLED":
+    case "FAILURE":
+    case "STALE":
+    case "STARTUP_FAILURE":
+    case "TIMED_OUT":
+      return "failing";
+    default:
+      return "unknown";
+  }
+}
+
+function toStatusContextState(state: unknown): PullRequestCiCheckState {
+  switch (state) {
+    case "SUCCESS":
+      return "passing";
+    case "FAILURE":
+    case "ERROR":
+      return "failing";
+    case "EXPECTED":
+    case "PENDING":
+      return "pending";
+    default:
+      return "unknown";
+  }
+}
+
+function toCiCheck(rawCheck: unknown): PullRequestCiCheck | null {
+  if (!rawCheck || typeof rawCheck !== "object") {
+    return null;
+  }
+
+  const check = rawCheck as {
+    __typename?: unknown;
+    name?: unknown;
+    context?: unknown;
+    status?: unknown;
+    conclusion?: unknown;
+    state?: unknown;
+    detailsUrl?: unknown;
+    targetUrl?: unknown;
+  };
+
+  if (check.__typename === "CheckRun") {
+    const name = stringOrNull(check.name);
+
+    if (!name) {
+      return null;
+    }
+
+    return {
+      name,
+      state: toCheckRunState(check.status, check.conclusion),
+      url: stringOrNull(check.detailsUrl),
+    };
+  }
+
+  if (check.__typename === "StatusContext") {
+    const name = stringOrNull(check.context);
+
+    if (!name) {
+      return null;
+    }
+
+    return {
+      name,
+      state: toStatusContextState(check.state),
+      url: stringOrNull(check.targetUrl),
+    };
+  }
+
+  return null;
+}
+
+function toCiStatusState(state: unknown, totalCount: number): PullRequestCiStatusState {
+  if (totalCount === 0) {
+    return "no-checks";
+  }
+
+  switch (state) {
+    case "SUCCESS":
+      return "passing";
+    case "FAILURE":
+      return "failing";
+    case "ERROR":
+      return "error";
+    case "EXPECTED":
+    case "PENDING":
+      return "pending";
+    default:
+      return "unknown";
+  }
+}
+
+function toPullRequestCiStatus(node: GraphQlPullRequestNode): PullRequestCiStatus {
+  const commitNode = Array.isArray(node.commits?.nodes) ? node.commits.nodes[0] : null;
+
+  if (!commitNode || typeof commitNode !== "object") {
+    return createEmptyCiStatus("unknown", null);
+  }
+
+  const commit = (commitNode as { commit?: unknown }).commit;
+
+  if (!commit || typeof commit !== "object") {
+    return createEmptyCiStatus("unknown", null);
+  }
+
+  const commitData = commit as {
+    oid?: unknown;
+    statusCheckRollup?: {
+      state?: unknown;
+      contexts?: {
+        totalCount?: unknown;
+        nodes?: unknown;
+      };
+    } | null;
+  };
+  const commitOid = stringOrNull(commitData.oid);
+
+  if (!commitData.statusCheckRollup) {
+    return createEmptyCiStatus("no-checks", commitOid);
+  }
+
+  const rawChecks = Array.isArray(commitData.statusCheckRollup.contexts?.nodes)
+    ? commitData.statusCheckRollup.contexts.nodes
+    : [];
+  const checks = rawChecks.flatMap((check) => {
+    const ciCheck = toCiCheck(check);
+    return ciCheck ? [ciCheck] : [];
+  });
+  const totalCount =
+    typeof commitData.statusCheckRollup.contexts?.totalCount === "number"
+      ? commitData.statusCheckRollup.contexts.totalCount
+      : checks.length;
+
+  const counts = checks.reduce(
+    (result, check) => {
+      result[check.state] += 1;
+      return result;
+    },
+    {
+      passing: 0,
+      failing: 0,
+      pending: 0,
+      skipped: 0,
+      unknown: 0,
+    } satisfies Record<PullRequestCiCheckState, number>,
+  );
+
+  return {
+    state: toCiStatusState(commitData.statusCheckRollup.state, totalCount),
+    commitOid,
+    totalCount,
+    passingCount: counts.passing,
+    failingCount: counts.failing,
+    pendingCount: counts.pending,
+    skippedCount: counts.skipped,
+    unknownCount: counts.unknown,
+    checks,
+    isIncomplete: totalCount > checks.length,
+  };
 }
 
 async function getAuthenticatedUserLogin(): Promise<string> {
@@ -169,6 +402,7 @@ function toPullRequestSummary(node: GraphQlPullRequestNode): PullRequestSummary 
     isDraft: node.isDraft,
     headRefName: node.headRefName,
     updatedAt: node.updatedAt,
+    ciStatus: toPullRequestCiStatus(node),
   };
 }
 
