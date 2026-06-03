@@ -1,5 +1,8 @@
 import PullRequestsPanel from "@/renderer/features/pull-requests/PullRequestsPanel";
-import { useAuthoredPullRequests } from "@/renderer/features/pull-requests/useAuthoredPullRequests";
+import {
+  useAuthoredPullRequests,
+  useReviewRequestedPullRequests,
+} from "@/renderer/features/pull-requests/useAuthoredPullRequests";
 import ReadinessPanel from "@/renderer/features/readiness/ReadinessPanel";
 import { useDependencyReadiness } from "@/renderer/features/readiness/useDependencyReadiness";
 import { tokens } from "@/styles/tokens";
@@ -50,16 +53,24 @@ function AppToolbar({
 
 export function App() {
   const readiness = useDependencyReadiness();
-  const pullRequests = useAuthoredPullRequests();
+  const authoredPullRequests = useAuthoredPullRequests();
+  const reviewRequestedPullRequests = useReviewRequestedPullRequests();
+  const isRefreshingPullRequests =
+    authoredPullRequests.isRefreshing || reviewRequestedPullRequests.isRefreshing;
+
+  const refreshPullRequests = () => {
+    void authoredPullRequests.refresh();
+    void reviewRequestedPullRequests.refresh();
+  };
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-canvas text-ink">
       <div className="flex h-full min-h-0 flex-col">
         <AppToolbar
           isCheckingReadiness={readiness.isChecking}
-          isRefreshingPullRequests={pullRequests.isRefreshing}
+          isRefreshingPullRequests={isRefreshingPullRequests}
           readinessSummaryText={readiness.summary}
-          onRefreshPullRequests={pullRequests.refresh}
+          onRefreshPullRequests={refreshPullRequests}
           onRunReadinessChecks={readiness.runChecks}
         />
 
@@ -69,15 +80,12 @@ export function App() {
           isChecking={readiness.isChecking}
         />
 
-        <main className="min-h-0 flex-1 overflow-hidden">
+        <main className="min-h-0 flex-1 overflow-auto">
           <PullRequestsPanel
+            authored={authoredPullRequests}
             checkedAt={readiness.checkedAt}
-            discovery={pullRequests.discovery}
-            error={pullRequests.error}
-            isRefreshing={pullRequests.isRefreshing}
-            openingPullRequestUrl={pullRequests.openingUrl}
             readinessSummaryText={readiness.summary}
-            onOpenPullRequest={pullRequests.openPullRequest}
+            reviewRequested={reviewRequestedPullRequests}
           />
         </main>
       </div>

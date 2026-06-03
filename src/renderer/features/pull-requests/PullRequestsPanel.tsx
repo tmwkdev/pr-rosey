@@ -7,6 +7,46 @@ import {
 } from "@/shared/pullRequests";
 import { tokens } from "@/styles/tokens";
 
+type PullRequestSectionKind = "authored" | "review-requested";
+
+type PullRequestSectionState = {
+  discovery: PullRequestDiscovery | null;
+  error: string | null;
+  isRefreshing: boolean;
+  openingUrl: string | null;
+  openPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
+  refresh: () => Promise<void>;
+};
+
+type PullRequestSectionCopy = {
+  countLabel: string;
+  emptyDescription: string;
+  emptyTitle: string;
+  eyebrow: string;
+  loadingText: string;
+  title: string;
+};
+
+const sectionCopy: Record<PullRequestSectionKind, PullRequestSectionCopy> = {
+  authored: {
+    countLabel: "authored by",
+    emptyDescription: "GitHub did not return any open PRs authored by the authenticated gh user.",
+    emptyTitle: "No open authored pull requests",
+    eyebrow: "Authored by me",
+    loadingText: "Fetching authored open pull requests from GitHub.",
+    title: "Open work",
+  },
+  "review-requested": {
+    countLabel: "requesting review from",
+    emptyDescription:
+      "GitHub did not return any open PRs where the authenticated gh user is a requested reviewer.",
+    emptyTitle: "No review requests",
+    eyebrow: "Review requested",
+    loadingText: "Fetching open pull requests that requested your review.",
+    title: "Needs your review",
+  },
+};
+
 function formatTimestamp(timestamp: string): string {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -14,71 +54,121 @@ function formatTimestamp(timestamp: string): string {
   }).format(new Date(timestamp));
 }
 
-function formatPullRequestCount(discovery: PullRequestDiscovery | null): string {
+function formatPullRequestCount(
+  discovery: PullRequestDiscovery | null,
+  kind: PullRequestSectionKind,
+): string {
+  const copy = sectionCopy[kind];
+
   if (!discovery) {
-    return "Fetching authored pull requests with GitHub CLI.";
+    return copy.loadingText;
   }
 
   const visibleCount = discovery.pullRequests.length;
   const totalCount = discovery.totalCount;
 
   if (discovery.isLimited) {
-    return `Showing ${visibleCount} of ${totalCount} open pull requests authored by @${discovery.viewerLogin}.`;
+    return `Showing ${visibleCount} of ${totalCount} open pull requests ${copy.countLabel} @${discovery.viewerLogin}.`;
   }
 
   return `${visibleCount} open pull request${
     visibleCount === 1 ? "" : "s"
-  } authored by @${discovery.viewerLogin}.`;
+  } ${copy.countLabel} @${discovery.viewerLogin}.`;
 }
 
 interface PullRequestsPanelProps {
+  authored: PullRequestSectionState;
   checkedAt: string;
-  discovery: PullRequestDiscovery | null;
-  error: string | null;
-  isRefreshing: boolean;
-  openingPullRequestUrl: string | null;
   readinessSummaryText: string;
-  onOpenPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
+  reviewRequested: PullRequestSectionState;
 }
 
 export function PullRequestsPanel({
+  authored,
   checkedAt,
-  discovery,
-  error,
-  isRefreshing,
-  openingPullRequestUrl,
   readinessSummaryText,
-  onOpenPullRequest,
+  reviewRequested,
 }: PullRequestsPanelProps) {
-  const hasError = Boolean(error);
-  const pullRequests = discovery?.pullRequests ?? [];
-  const showInitialLoading = isRefreshing && !discovery;
-
   return (
-    <section className="flex h-full min-h-0 flex-col bg-canvas">
-      <div className="shrink-0 border-b border-line bg-panel/40 px-4 py-3">
+    <section className="min-h-full bg-canvas">
+      <div className="border-b border-line bg-panel/40 px-4 py-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className={tokens.label.eyebrow}>Authored pull requests</p>
-            <h2 className="mt-1 text-base font-semibold text-ink">Open work</h2>
+            <p className={tokens.label.eyebrow}>Pull request inbox</p>
+            <h2 className="mt-1 text-base font-semibold text-ink">Open pull requests</h2>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <InboxFilterChip
+              count={authored.discovery?.pullRequests.length}
+              label="Authored by me"
+            />
+            <InboxFilterChip
+              count={reviewRequested.discovery?.pullRequests.length}
+              label="Review requested"
+            />
+          </div>
+        </div>
+      </div>
+
+      <PullRequestSection kind="authored" state={authored} />
+      <PullRequestSection kind="review-requested" state={reviewRequested} />
+
+      <ReadinessFooter checkedAt={checkedAt} summary={readinessSummaryText} />
+    </section>
+  );
+}
+
+interface InboxFilterChipProps {
+  count: number | undefined;
+  label: string;
+}
+
+function InboxFilterChip({ count, label }: InboxFilterChipProps) {
+  const countText = typeof count === "number" ? count.toString() : "-";
+
+  return (
+    <span className={`${tokens.badge.base} border-line bg-paper text-muted`}>
+      {label}
+      <span className="ml-2 font-mono text-ink">{countText}</span>
+    </span>
+  );
+}
+
+interface PullRequestSectionProps {
+  kind: PullRequestSectionKind;
+  state: PullRequestSectionState;
+}
+
+function PullRequestSection({ kind, state }: PullRequestSectionProps) {
+  const copy = sectionCopy[kind];
+  const hasError = Boolean(state.error);
+  const pullRequests = state.discovery?.pullRequests ?? [];
+  const showInitialLoading = state.isRefreshing && !state.discovery;
+
+  return (
+    <section className="border-b border-line">
+      <div className="bg-panel/20 px-4 py-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className={tokens.label.eyebrow}>{copy.eyebrow}</p>
+            <h3 className="mt-1 text-sm font-semibold text-ink">{copy.title}</h3>
           </div>
           <p className="max-w-2xl text-right text-sm text-muted">
-            {formatPullRequestCount(discovery)}
+            {formatPullRequestCount(state.discovery, kind)}
           </p>
         </div>
       </div>
 
-      {hasError && error ? <PullRequestError message={error} /> : null}
+      {hasError && state.error ? <PullRequestError message={state.error} /> : null}
 
       <PullRequestList
         hasError={hasError}
         isInitialLoading={showInitialLoading}
-        openingPullRequestUrl={openingPullRequestUrl}
+        kind={kind}
+        openingPullRequestUrl={state.openingUrl}
         pullRequests={pullRequests}
-        onOpenPullRequest={onOpenPullRequest}
+        onOpenPullRequest={state.openPullRequest}
       />
-
-      <ReadinessFooter checkedAt={checkedAt} summary={readinessSummaryText} />
     </section>
   );
 }
@@ -89,15 +179,14 @@ interface PullRequestErrorProps {
 
 function PullRequestError({ message }: PullRequestErrorProps) {
   return (
-    <div className="shrink-0 border-b border-rust/35 bg-rust/10 px-4 py-3 text-sm text-rust">
-      {message}
-    </div>
+    <div className="border-t border-rust/35 bg-rust/10 px-4 py-3 text-sm text-rust">{message}</div>
   );
 }
 
 interface PullRequestListProps {
   hasError: boolean;
   isInitialLoading: boolean;
+  kind: PullRequestSectionKind;
   openingPullRequestUrl: string | null;
   pullRequests: PullRequestSummary[];
   onOpenPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
@@ -106,33 +195,35 @@ interface PullRequestListProps {
 function PullRequestList({
   hasError,
   isInitialLoading,
+  kind,
   openingPullRequestUrl,
   pullRequests,
   onOpenPullRequest,
 }: PullRequestListProps) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_5.5rem] gap-3 border-b border-line bg-panel/30 px-4 py-2 text-xs font-medium text-muted sm:grid-cols-[minmax(0,1fr)_6rem_7rem_5.5rem]">
+    <div>
+      <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 border-y border-line bg-panel/30 px-4 py-2 text-xs font-medium text-muted sm:grid-cols-[minmax(0,1fr)_6rem_7rem_5.5rem]">
         <span>Pull request</span>
-        <span>State</span>
+        <span>Status</span>
         <span className="hidden sm:block">CI</span>
         <span className="text-right">Action</span>
       </div>
 
       {isInitialLoading ? (
-        <div className="px-4 py-8 text-sm text-muted">
-          Fetching authored open pull requests from GitHub.
-        </div>
+        <div className="px-4 py-8 text-sm text-muted">{sectionCopy[kind].loadingText}</div>
       ) : null}
 
-      {!isInitialLoading && !hasError && pullRequests.length === 0 ? <EmptyPullRequests /> : null}
+      {!isInitialLoading && !hasError && pullRequests.length === 0 ? (
+        <EmptyPullRequests kind={kind} />
+      ) : null}
 
       {pullRequests.length > 0 ? (
-        <div className="min-h-0 flex-1 divide-y divide-line overflow-auto">
+        <div className="divide-y divide-line">
           {pullRequests.map((pullRequest) => (
             <PullRequestRow
               isOpening={openingPullRequestUrl === pullRequest.url}
               key={pullRequest.url}
+              kind={kind}
               pullRequest={pullRequest}
               onOpenPullRequest={onOpenPullRequest}
             />
@@ -143,24 +234,29 @@ function PullRequestList({
   );
 }
 
-function EmptyPullRequests() {
+interface EmptyPullRequestsProps {
+  kind: PullRequestSectionKind;
+}
+
+function EmptyPullRequests({ kind }: EmptyPullRequestsProps) {
+  const copy = sectionCopy[kind];
+
   return (
     <div className="px-4 py-8">
-      <h3 className="font-medium text-ink">No open authored pull requests</h3>
-      <p className="mt-1 text-sm text-muted">
-        GitHub did not return any open PRs authored by the authenticated gh user.
-      </p>
+      <h4 className="font-medium text-ink">{copy.emptyTitle}</h4>
+      <p className="mt-1 text-sm text-muted">{copy.emptyDescription}</p>
     </div>
   );
 }
 
 interface PullRequestRowProps {
   isOpening: boolean;
+  kind: PullRequestSectionKind;
   pullRequest: PullRequestSummary;
   onOpenPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
 }
 
-function PullRequestRow({ isOpening, pullRequest, onOpenPullRequest }: PullRequestRowProps) {
+function PullRequestRow({ isOpening, kind, pullRequest, onOpenPullRequest }: PullRequestRowProps) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 px-4 py-3 text-sm hover:bg-panel/45 sm:grid-cols-[minmax(0,1fr)_6rem_7rem_5.5rem]">
       <div className="min-w-0">
@@ -170,12 +266,15 @@ function PullRequestRow({ isOpening, pullRequest, onOpenPullRequest }: PullReque
         </div>
         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
           <span className="truncate">{pullRequest.repository.nameWithOwner}</span>
+          {kind === "review-requested" ? (
+            <span className="truncate">by @{pullRequest.authorLogin}</span>
+          ) : null}
           <span className="truncate font-mono">{pullRequest.headRefName}</span>
           <span>Updated {formatTimestamp(pullRequest.updatedAt)}</span>
         </div>
       </div>
 
-      <PullRequestStatusBadge isDraft={pullRequest.isDraft} />
+      <PullRequestStatusBadge isDraft={pullRequest.isDraft} kind={kind} />
       <div className="hidden min-w-0 sm:block">
         <PullRequestCiStatusBadge status={pullRequest.ciStatus} />
       </div>
@@ -198,20 +297,16 @@ function PullRequestRow({ isOpening, pullRequest, onOpenPullRequest }: PullReque
 
 interface PullRequestStatusBadgeProps {
   isDraft: boolean;
+  kind: PullRequestSectionKind;
 }
 
-function PullRequestStatusBadge({ isDraft }: PullRequestStatusBadgeProps) {
+function PullRequestStatusBadge({ isDraft, kind }: PullRequestStatusBadgeProps) {
   const statusClassName = isDraft
     ? "border-amber-300/30 bg-amber-300/10 text-amber-200"
     : "border-moss/25 bg-moss/10 text-moss";
+  const label = isDraft ? "Draft" : kind === "review-requested" ? "Review" : "Open";
 
-  return (
-    <span
-      className={`inline-flex h-fit w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusClassName}`}
-    >
-      {isDraft ? "Draft" : "Open"}
-    </span>
-  );
+  return <span className={`${tokens.badge.base} ${statusClassName}`}>{label}</span>;
 }
 
 interface PullRequestCiStatusProps {
@@ -226,9 +321,7 @@ function PullRequestCiStatusBadge({ status }: PullRequestCiStatusProps) {
 
   return (
     <div className="min-w-0">
-      <span
-        className={`inline-flex h-fit w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusClassName}`}
-      >
+      <span className={`${tokens.badge.base} ${statusClassName}`}>
         {ciStatusLabels[status.state]}
       </span>
       <p className="mt-1 truncate text-xs text-muted">{formatCiStatusSummary(status)}</p>
@@ -265,7 +358,7 @@ interface ReadinessFooterProps {
 
 function ReadinessFooter({ checkedAt, summary }: ReadinessFooterProps) {
   return (
-    <footer className="shrink-0 border-t border-line bg-panel/70 px-4 py-2 text-xs text-muted">
+    <footer className="border-t border-line bg-panel/70 px-4 py-2 text-xs text-muted">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p>{summary} Polling, prompt generation, and agent handoff remain out of scope.</p>
         <span>Last check: {checkedAt}</span>

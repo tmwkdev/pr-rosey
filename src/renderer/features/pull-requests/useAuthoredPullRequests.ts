@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PullRequestDiscovery, PullRequestSummary } from "@/shared/pullRequests";
 
-export function useAuthoredPullRequests() {
+type PullRequestFetcher = () => Promise<PullRequestDiscovery>;
+
+function usePullRequestDiscovery(
+  fetchPullRequests: PullRequestFetcher,
+  fallbackErrorMessage: string,
+) {
   const [discovery, setDiscovery] = useState<PullRequestDiscovery | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -12,18 +17,14 @@ export function useAuthoredPullRequests() {
     setError(null);
 
     try {
-      const result = await window.prRosey.pullRequests.fetchAuthoredOpen();
+      const result = await fetchPullRequests();
       setDiscovery(result);
     } catch (refreshError) {
-      setError(
-        refreshError instanceof Error
-          ? refreshError.message
-          : "Could not fetch authored pull requests from GitHub.",
-      );
+      setError(refreshError instanceof Error ? refreshError.message : fallbackErrorMessage);
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [fallbackErrorMessage, fetchPullRequests]);
 
   const openPullRequest = useCallback(async (pullRequest: PullRequestSummary) => {
     setOpeningUrl(pullRequest.url);
@@ -52,4 +53,23 @@ export function useAuthoredPullRequests() {
     openPullRequest,
     refresh,
   };
+}
+
+const fetchAuthoredOpenPullRequests = () => window.prRosey.pullRequests.fetchAuthoredOpen();
+
+const fetchReviewRequestedOpenPullRequests = () =>
+  window.prRosey.pullRequests.fetchReviewRequestedOpen();
+
+export function useAuthoredPullRequests() {
+  return usePullRequestDiscovery(
+    fetchAuthoredOpenPullRequests,
+    "Could not fetch authored pull requests from GitHub.",
+  );
+}
+
+export function useReviewRequestedPullRequests() {
+  return usePullRequestDiscovery(
+    fetchReviewRequestedOpenPullRequests,
+    "Could not fetch review-requested pull requests from GitHub.",
+  );
 }

@@ -7,6 +7,8 @@ const api: PrRoseyApi = {
   },
   pullRequests: {
     fetchAuthoredOpen: () => ipcRenderer.invoke(ipcChannels.fetchPullRequests),
+    fetchReviewRequestedOpen: () =>
+      ipcRenderer.invoke(ipcChannels.fetchReviewRequestedPullRequests),
     openUrl: (url) => ipcRenderer.invoke(ipcChannels.openPullRequestUrl, url),
   },
 };

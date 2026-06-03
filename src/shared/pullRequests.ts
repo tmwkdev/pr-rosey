@@ -33,6 +33,7 @@ export type PullRequestSummary = {
     name: string;
     nameWithOwner: string;
   };
+  authorLogin: string;
   title: string;
   number: number;
   url: string;

@@ -5,6 +5,9 @@ export const tokens = {
     secondary:
       "inline-flex min-h-9 items-center justify-center rounded-md border border-line bg-panel px-3.5 py-2 text-sm font-medium text-ink shadow-sm shadow-black/20 transition hover:border-faint hover:bg-white/[0.04] focus:outline-none focus:ring-2 focus:ring-moss/30 focus:ring-offset-2 focus:ring-offset-paper disabled:cursor-not-allowed disabled:opacity-55",
   },
+  badge: {
+    base: "inline-flex h-fit w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+  },
   card: {
     panel: "rounded-lg border border-line bg-panel shadow-panel",
     section: "rounded-md border border-line bg-white/[0.03]",
