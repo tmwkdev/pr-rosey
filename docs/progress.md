@@ -20,19 +20,27 @@ into `docs/plans/completed/` when it matters later.
 - Current implemented surface:
   - Dependency readiness checks for `gh`, `gh auth status`, and `git`.
   - Authored open PR discovery through GitHub CLI and GraphQL search.
+  - Review-requested open PR discovery through GitHub CLI and GraphQL search.
   - CI status rollup display for PR head commits.
-  - Manual refresh and PR URL browser handoff through typed preload IPC.
+  - Manual refresh for authored and review-requested PR sections, plus PR URL
+    browser handoff through typed preload IPC.
   - Full-window Electron renderer shell with readiness and pull-request panels.
 - `AGENTS.md` is modified in the worktree from outside this cleanup and should be
   treated as user-owned unless a future approved task includes it.
 
 ## Latest Verified Evidence
 
-- `npm run check` passed after the renderer full-window UI update.
+- `npm run check` passed after the review-requested PR inbox update; the
+  separate reviewer also reran `npm run check` successfully.
+- `npm run dev` launched Electron/Vite after the review-requested PR inbox
+  update, and `http://localhost:5173/` returned 200 before shutdown.
+- GitHub CLI smoke checks confirmed:
+  - `review-requested:<viewer>` is a valid GraphQL search qualifier and returned
+    0 open PRs for the current account.
+  - `author:<viewer>` returned 1 open PR for the current account.
 - `npm run build` passed after the renderer full-window UI update.
-- `npm run dev` launched Electron/Vite, and `http://localhost:5173/` returned 200.
 - Separate reviewer agents found no blocking issues for the recent renderer and
-  harness chunks.
+  review-requested PR inbox chunks.
 - GitHub CLI dogfooding confirmed:
   - Feature PR #5 passed `Lint and typecheck`.
   - Intentional failing PR #6 failed `Lint and typecheck` as expected.
@@ -60,6 +68,8 @@ into `docs/plans/completed/` when it matters later.
   tests and build are expected in CI before relying on CI as the full verification gate.
 - Manual Electron verification has mostly been terminal-level smoke launch evidence;
   renderer screenshot or browser-based evidence may be useful for future UI-heavy work.
+- The review-requested populated-row path is code-reviewed but not live-data verified
+  locally because the current account had no matching open PRs.
 - `actionlint` was not run locally for the GitHub Actions work noted above.
 
 ## Next Best Step
@@ -80,3 +90,24 @@ Wait for a human-approved work item. For the next product increment:
 - Behavior changed: none; documentation-only cleanup.
 - Verification: `npm run check` passed; diff reviewed for documentation scope.
 - Review: separate reviewer found one missing verification-receipt detail; fixed here.
+
+## 2026-06-02 Review-Requested PR Receipt
+
+- Approved scope: chat-approved feature to show open PRs where the authenticated
+  `gh` user is requested as a reviewer, as a scroll-down section on the same page.
+- Changed files: `src/main/index.ts`, `src/main/pullRequestService.ts`,
+  `src/preload/index.ts`, `src/shared/ipc.ts`, `src/shared/pullRequests.ts`,
+  `src/renderer/App.tsx`,
+  `src/renderer/features/pull-requests/PullRequestsPanel.tsx`,
+  `src/renderer/features/pull-requests/useAuthoredPullRequests.ts`, and
+  `src/styles/tokens.ts`.
+- Behavior changed: added typed review-requested PR discovery through main/preload
+  IPC and a single scrollable PR inbox with authored and review-requested sections.
+- Verification: `npm run check` passed; `npm run dev` launched Electron/Vite and
+  `http://localhost:5173/` returned 200; targeted `gh api graphql` smoke checks
+  validated both authored and review-requested search qualifiers.
+- Review: separate reviewer found no findings and reran `npm run check`
+  successfully.
+- Remaining risk: no in-app Browser screenshot was captured because `iab` was
+  unavailable; populated review-requested rows were not live-data verified because
+  the current account had no matching open PRs.

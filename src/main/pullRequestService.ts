@@ -11,7 +11,7 @@ import type {
 const pageSize = 100;
 const maxPages = 10;
 
-const authoredPullRequestsQuery = `
+const pullRequestsSearchQuery = `
 query($searchQuery: String!, $first: Int!, $cursor: String) {
   search(query: $searchQuery, type: ISSUE, first: $first, after: $cursor) {
     issueCount
@@ -31,6 +31,9 @@ query($searchQuery: String!, $first: Int!, $cursor: String) {
         title
         number
         url
+        author {
+          login
+        }
         isDraft
         headRefName
         updatedAt
@@ -78,6 +81,9 @@ type GraphQlPullRequestNode = {
   title?: unknown;
   number?: unknown;
   url?: unknown;
+  author?: {
+    login?: unknown;
+  } | null;
   isDraft?: unknown;
   headRefName?: unknown;
   updatedAt?: unknown;
@@ -335,12 +341,13 @@ async function getAuthenticatedUserLogin(): Promise<string> {
 async function runPullRequestSearch(
   searchQuery: string,
   cursor: string | null,
+  errorMessage: string,
 ): Promise<GraphQlSearchResponse> {
   const args = [
     "api",
     "graphql",
     "-f",
-    `query=${authoredPullRequestsQuery}`,
+    `query=${pullRequestsSearchQuery}`,
     "-f",
     `searchQuery=${searchQuery}`,
     "-F",
@@ -357,12 +364,7 @@ async function runPullRequestSearch(
     const result = await runShellCommand("gh", args);
     stdout = result.stdout;
   } catch (error) {
-    throw new Error(
-      commandFailureMessage(
-        error as ShellCommandError,
-        "Could not fetch authored pull requests with gh.",
-      ),
-    );
+    throw new Error(commandFailureMessage(error as ShellCommandError, errorMessage));
   }
 
   return parseJson<GraphQlSearchResponse>(
@@ -375,6 +377,7 @@ function toPullRequestSummary(node: GraphQlPullRequestNode): PullRequestSummary 
   const owner = node.repository?.owner?.login;
   const name = node.repository?.name;
   const nameWithOwner = node.repository?.nameWithOwner;
+  const authorLogin = stringOrNull(node.author?.login) ?? "unknown";
 
   if (
     typeof owner !== "string" ||
@@ -396,6 +399,7 @@ function toPullRequestSummary(node: GraphQlPullRequestNode): PullRequestSummary 
       name,
       nameWithOwner,
     },
+    authorLogin,
     title: node.title,
     number: node.number,
     url: node.url,
@@ -406,16 +410,18 @@ function toPullRequestSummary(node: GraphQlPullRequestNode): PullRequestSummary 
   };
 }
 
-export async function fetchAuthoredOpenPullRequests(): Promise<PullRequestDiscovery> {
-  const viewerLogin = await getAuthenticatedUserLogin();
-  const searchQuery = `is:pr is:open author:${viewerLogin} sort:updated-desc`;
+async function fetchOpenPullRequests(
+  searchQuery: string,
+  viewerLogin: string,
+  errorMessage: string,
+): Promise<PullRequestDiscovery> {
   const pullRequests: PullRequestSummary[] = [];
   let cursor: string | null = null;
   let totalCount = 0;
   let isLimited = false;
 
   for (let page = 0; page < maxPages; page += 1) {
-    const response = await runPullRequestSearch(searchQuery, cursor);
+    const response = await runPullRequestSearch(searchQuery, cursor, errorMessage);
     const search = response.data?.search;
 
     if (!search) {
@@ -458,4 +464,22 @@ export async function fetchAuthoredOpenPullRequests(): Promise<PullRequestDiscov
     totalCount,
     isLimited,
   };
+}
+
+export async function fetchAuthoredOpenPullRequests(): Promise<PullRequestDiscovery> {
+  const viewerLogin = await getAuthenticatedUserLogin();
+  return fetchOpenPullRequests(
+    `is:pr is:open author:${viewerLogin} sort:updated-desc`,
+    viewerLogin,
+    "Could not fetch authored pull requests with gh.",
+  );
+}
+
+export async function fetchReviewRequestedOpenPullRequests(): Promise<PullRequestDiscovery> {
+  const viewerLogin = await getAuthenticatedUserLogin();
+  return fetchOpenPullRequests(
+    `is:pr is:open review-requested:${viewerLogin} sort:updated-desc`,
+    viewerLogin,
+    "Could not fetch review-requested pull requests with gh.",
+  );
 }

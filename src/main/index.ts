@@ -2,7 +2,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { checkDependencies } from "@/main/dependencyCheckService";
-import { fetchAuthoredOpenPullRequests } from "@/main/pullRequestService";
+import {
+  fetchAuthoredOpenPullRequests,
+  fetchReviewRequestedOpenPullRequests,
+} from "@/main/pullRequestService";
 import { ipcChannels } from "@/shared/ipc";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +39,9 @@ function createWindow(): void {
 
 ipcMain.handle(ipcChannels.checkDependencies, () => checkDependencies());
 ipcMain.handle(ipcChannels.fetchPullRequests, () => fetchAuthoredOpenPullRequests());
+ipcMain.handle(ipcChannels.fetchReviewRequestedPullRequests, () =>
+  fetchReviewRequestedOpenPullRequests(),
+);
 ipcMain.handle(ipcChannels.openPullRequestUrl, async (_event, url: unknown) => {
   if (typeof url !== "string") {
     throw new Error("Pull request URL must be a string.");
