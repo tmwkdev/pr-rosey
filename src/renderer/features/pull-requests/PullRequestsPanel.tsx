@@ -26,7 +26,9 @@ function formatPullRequestCount(discovery: PullRequestDiscovery | null): string 
     return `Showing ${visibleCount} of ${totalCount} open pull requests authored by @${discovery.viewerLogin}.`;
   }
 
-  return `${visibleCount} open pull request${visibleCount === 1 ? "" : "s"} authored by @${discovery.viewerLogin}.`;
+  return `${visibleCount} open pull request${
+    visibleCount === 1 ? "" : "s"
+  } authored by @${discovery.viewerLogin}.`;
 }
 
 interface PullRequestsPanelProps {
@@ -37,7 +39,6 @@ interface PullRequestsPanelProps {
   openingPullRequestUrl: string | null;
   readinessSummaryText: string;
   onOpenPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
-  onRefreshPullRequests: () => void;
 }
 
 export function PullRequestsPanel({
@@ -48,30 +49,23 @@ export function PullRequestsPanel({
   openingPullRequestUrl,
   readinessSummaryText,
   onOpenPullRequest,
-  onRefreshPullRequests,
 }: PullRequestsPanelProps) {
   const hasError = Boolean(error);
   const pullRequests = discovery?.pullRequests ?? [];
   const showInitialLoading = isRefreshing && !discovery;
 
   return (
-    <section className="flex min-h-0 flex-col p-5 sm:p-7">
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-2">
-          <p className={tokens.label.eyebrow}>Pull requests</p>
-          <h2 className="text-3xl font-semibold">Authored open PRs</h2>
-          <p className={`max-w-2xl ${tokens.text.mutedBody}`}>
+    <section className="flex h-full min-h-0 flex-col bg-canvas">
+      <div className="shrink-0 border-b border-line bg-panel/40 px-4 py-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className={tokens.label.eyebrow}>Authored pull requests</p>
+            <h2 className="mt-1 text-base font-semibold text-ink">Open work</h2>
+          </div>
+          <p className="max-w-2xl text-right text-sm text-muted">
             {formatPullRequestCount(discovery)}
           </p>
         </div>
-        <button
-          className={tokens.button.primary}
-          disabled={isRefreshing}
-          type="button"
-          onClick={onRefreshPullRequests}
-        >
-          {isRefreshing ? "Refreshing" : "Refresh"}
-        </button>
       </div>
 
       {hasError && error ? <PullRequestError message={error} /> : null}
@@ -95,10 +89,9 @@ interface PullRequestErrorProps {
 
 function PullRequestError({ message }: PullRequestErrorProps) {
   return (
-    <section className={`${tokens.card.section} mb-4 border-rosey/30 bg-rosey/10 p-4`}>
-      <p className="text-sm font-medium text-rosey">GitHub pull requests unavailable</p>
-      <p className={`mt-1 ${tokens.text.mutedBody}`}>{message}</p>
-    </section>
+    <div className="shrink-0 border-b border-rust/35 bg-rust/10 px-4 py-3 text-sm text-rust">
+      {message}
+    </div>
   );
 }
 
@@ -118,10 +111,12 @@ function PullRequestList({
   onOpenPullRequest,
 }: PullRequestListProps) {
   return (
-    <div className={`${tokens.card.panel} min-h-0 overflow-hidden`}>
-      <div className="grid grid-cols-[1fr_auto] border-line border-b px-4 py-3 text-xs font-medium uppercase tracking-[0.16em] text-muted">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_5.5rem] gap-3 border-b border-line bg-panel/30 px-4 py-2 text-xs font-medium text-muted sm:grid-cols-[minmax(0,1fr)_6rem_7rem_5.5rem]">
         <span>Pull request</span>
-        <span>CI</span>
+        <span>State</span>
+        <span className="hidden sm:block">CI</span>
+        <span className="text-right">Action</span>
       </div>
 
       {isInitialLoading ? (
@@ -133,7 +128,7 @@ function PullRequestList({
       {!isInitialLoading && !hasError && pullRequests.length === 0 ? <EmptyPullRequests /> : null}
 
       {pullRequests.length > 0 ? (
-        <div className="max-h-[28rem] divide-y divide-line overflow-auto">
+        <div className="min-h-0 flex-1 divide-y divide-line overflow-auto">
           {pullRequests.map((pullRequest) => (
             <PullRequestRow
               isOpening={openingPullRequestUrl === pullRequest.url}
@@ -151,8 +146,8 @@ function PullRequestList({
 function EmptyPullRequests() {
   return (
     <div className="px-4 py-8">
-      <h3 className="font-medium">No open authored pull requests</h3>
-      <p className={`mt-1 ${tokens.text.mutedBody}`}>
+      <h3 className="font-medium text-ink">No open authored pull requests</h3>
+      <p className="mt-1 text-sm text-muted">
         GitHub did not return any open PRs authored by the authenticated gh user.
       </p>
     </div>
@@ -167,38 +162,36 @@ interface PullRequestRowProps {
 
 function PullRequestRow({ isOpening, pullRequest, onOpenPullRequest }: PullRequestRowProps) {
   return (
-    <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(9rem,12rem)_auto_minmax(10rem,13rem)_auto] lg:items-center">
-      <div className={tokens.layout.detailStack}>
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">
-          {pullRequest.repository.nameWithOwner}
-        </p>
-        <h3 className="break-words font-medium leading-6">
-          {pullRequest.title}{" "}
-          <span className="font-mono text-sm text-muted">#{pullRequest.number}</span>
-        </h3>
-        <p className="break-all font-mono text-xs text-muted">{pullRequest.url}</p>
-      </div>
-
-      <div className={tokens.layout.detailStack}>
-        <p className={tokens.text.meta}>Source branch</p>
-        <p className="break-all font-mono text-sm text-ink">{pullRequest.headRefName}</p>
-        <p className={tokens.text.meta}>Updated {formatTimestamp(pullRequest.updatedAt)}</p>
+    <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 px-4 py-3 text-sm hover:bg-panel/45 sm:grid-cols-[minmax(0,1fr)_6rem_7rem_5.5rem]">
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+          <p className="truncate font-medium text-ink">{pullRequest.title}</p>
+          <span className="font-mono text-xs text-muted">#{pullRequest.number}</span>
+        </div>
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+          <span className="truncate">{pullRequest.repository.nameWithOwner}</span>
+          <span className="truncate font-mono">{pullRequest.headRefName}</span>
+          <span>Updated {formatTimestamp(pullRequest.updatedAt)}</span>
+        </div>
       </div>
 
       <PullRequestStatusBadge isDraft={pullRequest.isDraft} />
+      <div className="hidden min-w-0 sm:block">
+        <PullRequestCiStatusBadge status={pullRequest.ciStatus} />
+      </div>
 
-      <PullRequestCiStatusBadge status={pullRequest.ciStatus} />
-
-      <button
-        className={tokens.button.secondary}
-        disabled={isOpening}
-        type="button"
-        onClick={() => {
-          void onOpenPullRequest(pullRequest);
-        }}
-      >
-        {isOpening ? "Opening" : "Open"}
-      </button>
+      <div className="flex justify-end">
+        <button
+          className={tokens.button.secondary}
+          disabled={isOpening}
+          type="button"
+          onClick={() => {
+            void onOpenPullRequest(pullRequest);
+          }}
+        >
+          {isOpening ? "Opening" : "Open"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -214,7 +207,7 @@ function PullRequestStatusBadge({ isDraft }: PullRequestStatusBadgeProps) {
 
   return (
     <span
-      className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusClassName}`}
+      className={`inline-flex h-fit w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusClassName}`}
     >
       {isDraft ? "Draft" : "Open"}
     </span>
@@ -232,13 +225,14 @@ function PullRequestCiStatusBadge({ status }: PullRequestCiStatusProps) {
     .slice(0, 2);
 
   return (
-    <div className={tokens.layout.detailStack}>
+    <div className="min-w-0">
       <span
-        className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusClassName}`}
+        className={`inline-flex h-fit w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusClassName}`}
       >
         {ciStatusLabels[status.state]}
       </span>
-      <p className={tokens.text.meta}>{formatCiStatusSummary(status)}</p>
+      <p className="mt-1 truncate text-xs text-muted">{formatCiStatusSummary(status)}</p>
+
       {visibleChecks.length > 0 ? (
         <p className="truncate text-xs text-muted">
           {visibleChecks.map((check) => check.name).join(", ")}
@@ -271,15 +265,13 @@ interface ReadinessFooterProps {
 
 function ReadinessFooter({ checkedAt, summary }: ReadinessFooterProps) {
   return (
-    <div className="mt-auto pt-5">
-      <section className={`${tokens.card.section} p-4`}>
-        <div
-          className={`grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center ${tokens.text.mutedBody}`}
-        >
-          <p>{summary} Polling, prompt generation, and agent handoff remain out of scope.</p>
-          <span className="font-mono text-xs">Last check: {checkedAt}</span>
-        </div>
-      </section>
-    </div>
+    <footer className="shrink-0 border-t border-line bg-panel/70 px-4 py-2 text-xs text-muted">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p>{summary} Polling, prompt generation, and agent handoff remain out of scope.</p>
+        <span>Last check: {checkedAt}</span>
+      </div>
+    </footer>
   );
 }
+
+export default PullRequestsPanel;
