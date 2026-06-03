@@ -8,6 +8,7 @@ the next agent or human who needs to make a product change.
 - `harness.md` - how agents should work in this repo
 - `product.md` - product purpose, boundaries, and current product surface
 - `architecture.md` - Electron layer ownership and IPC boundaries
+- `frontend.md` - renderer styling, component, token, badge, and status guidance
 - `progress.md` - latest handoff state and verification notes
 - `plans/` - active and completed work items
 - `plan-template.md` - template for approved work items

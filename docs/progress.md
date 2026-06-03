@@ -45,6 +45,24 @@ into `docs/plans/completed/` when it matters later.
   - Feature PR #5 passed `Lint and typecheck`.
   - Intentional failing PR #6 failed `Lint and typecheck` as expected.
 
+## 2026-06-03 Frontend Guidance Receipt
+
+- Approved scope: chat-approved harness update to reduce badge overuse and add
+  practical frontend component-selection guidance, then move detailed styling
+  best practices out of the harness, then broaden `docs/frontend.md` into a
+  component-choice guide based primarily on Shopify Polaris-style component
+  usage descriptions.
+- Changed files: `docs/frontend.md`, `docs/harness.md`, `docs/README.md`, and
+  this progress note.
+- Behavior changed: none; documentation-only harness update.
+- Research basis: compared Shopify Polaris component taxonomy and usage docs,
+  Atlassian, Primer, Designsystemet, Scottish Government Design System,
+  Wikimedia Codex tokens, W3C WCAG, W3C ARIA Authoring Practices, and
+  agentic design-system guidance.
+- Verification: `npm run check` passed after broadening `docs/frontend.md`.
+- Review: separate-agent review passed after moving the guidance out of the harness; the later
+  Polaris-style component catalog broadening was not separately reviewed before user-approved commit.
+
 ## 2026-06-03 Direct Review Requests Receipt
 
 - Approved scope: chat-approved fix so "Needs your review" matches GitHub's
@@ -72,7 +90,8 @@ into `docs/plans/completed/` when it matters later.
 - Repo-local skills live under `skills/`:
   - Implementers use `skills/pr-rosey-implementer/SKILL.md`.
   - Reviewers use `skills/pr-rosey-reviewer/SKILL.md`.
-- `docs/harness.md` is the harness source of truth; `docs/README.md` is the docs map.
+- `docs/harness.md` is the harness source of truth; `docs/frontend.md` owns
+  frontend styling/component guidance; `docs/README.md` is the docs map.
 - Approved work items belong in `docs/plans/active/` and should move to
   `docs/plans/completed/` when complete.
 - Completed plan notes currently cover:
