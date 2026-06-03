@@ -45,6 +45,28 @@ into `docs/plans/completed/` when it matters later.
   - Feature PR #5 passed `Lint and typecheck`.
   - Intentional failing PR #6 failed `Lint and typecheck` as expected.
 
+## 2026-06-03 Direct Review Requests Receipt
+
+- Approved scope: chat-approved fix so "Needs your review" matches GitHub's
+  direct named-reviewer behavior and excludes team-only review requests.
+- Changed files: `src/main/pullRequestService.ts`,
+  `src/main/pullRequestService.test.ts`,
+  `src/renderer/features/pull-requests/PullRequestsPanel.tsx`, and this
+  progress note.
+- Behavior changed: review-requested discovery now uses
+  `user-review-requested:@me` instead of `review-requested:<viewer>`, and the
+  visible section copy says direct/named review requests.
+- Verification: `npm test -- --run` passed; `npm run check` passed after
+  `npm install` updated the pulled dependency tree; `npm run dev` launched
+  Electron/Vite and `http://localhost:5173/` returned 200. After the local
+  `gh` session was authenticated, `gh api user --jq .login` returned
+  `tykowale`, the direct `user-review-requested:@me` GraphQL search returned
+  0 open PRs, and a second Electron launch showed no previous `gh` auth
+  handler errors.
+- Remaining risk: populated direct-review rows were not live-data verified
+  because the authenticated account had no matching open PRs.
+- Review: separate-agent review is still pending.
+
 ## Durable Notes
 
 - Repo-local skills live under `skills/`:

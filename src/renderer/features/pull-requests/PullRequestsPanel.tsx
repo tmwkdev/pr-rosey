@@ -37,12 +37,12 @@ const sectionCopy: Record<PullRequestSectionKind, PullRequestSectionCopy> = {
     title: "Open work",
   },
   "review-requested": {
-    countLabel: "requesting review from",
+    countLabel: "directly requesting review from",
     emptyDescription:
-      "GitHub did not return any open PRs where the authenticated gh user is a requested reviewer.",
-    emptyTitle: "No review requests",
-    eyebrow: "Review requested",
-    loadingText: "Fetching open pull requests that requested your review.",
+      "GitHub did not return any open PRs where the authenticated gh user is directly requested as a reviewer.",
+    emptyTitle: "No direct review requests",
+    eyebrow: "Named reviewer",
+    loadingText: "Fetching open pull requests that directly requested your review.",
     title: "Needs your review",
   },
 };

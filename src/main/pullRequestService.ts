@@ -410,6 +410,14 @@ function toPullRequestSummary(node: GraphQlPullRequestNode): PullRequestSummary 
   };
 }
 
+export function createAuthoredOpenPullRequestsSearchQuery(viewerLogin: string): string {
+  return `is:pr is:open author:${viewerLogin} sort:updated-desc`;
+}
+
+export function createDirectReviewRequestedOpenPullRequestsSearchQuery(): string {
+  return "is:pr is:open user-review-requested:@me sort:updated-desc";
+}
+
 async function fetchOpenPullRequests(
   searchQuery: string,
   viewerLogin: string,
@@ -469,7 +477,7 @@ async function fetchOpenPullRequests(
 export async function fetchAuthoredOpenPullRequests(): Promise<PullRequestDiscovery> {
   const viewerLogin = await getAuthenticatedUserLogin();
   return fetchOpenPullRequests(
-    `is:pr is:open author:${viewerLogin} sort:updated-desc`,
+    createAuthoredOpenPullRequestsSearchQuery(viewerLogin),
     viewerLogin,
     "Could not fetch authored pull requests with gh.",
   );
@@ -478,7 +486,7 @@ export async function fetchAuthoredOpenPullRequests(): Promise<PullRequestDiscov
 export async function fetchReviewRequestedOpenPullRequests(): Promise<PullRequestDiscovery> {
   const viewerLogin = await getAuthenticatedUserLogin();
   return fetchOpenPullRequests(
-    `is:pr is:open review-requested:${viewerLogin} sort:updated-desc`,
+    createDirectReviewRequestedOpenPullRequestsSearchQuery(),
     viewerLogin,
     "Could not fetch review-requested pull requests with gh.",
   );
