@@ -4,6 +4,33 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-04 Pi Managed Runner Spike Receipt
+
+- Approved scope: `docs/plans/active/pi-managed-pr-runner-spike.md`, now moved to
+  `docs/plans/completed/pi-managed-pr-runner-spike.md`.
+- Changed: added Pi runner readiness, managed PR worktree creation/reuse with source-repo and origin
+  safety checks, Pi RPC subprocess supervision, typed runner IPC/preload methods, renderer Babysit
+  action/session console, durable session metadata/log writes, and focused runner tests.
+- Files changed: `src/shared/runner.ts`, `src/main/gitWorktreeService.ts`,
+  `src/main/piReadinessService.ts`, `src/main/piRunnerSessionService.ts`,
+  `src/main/shellCommand.ts`, `src/main/index.ts`, `src/shared/ipc.ts`, `src/preload/index.ts`,
+  renderer PR/runner files, runner tests, active-plan index, completed plan, and this progress note.
+- Verification: `npm test -- --run src/main/gitWorktreeService.test.ts` passed; `npm run check`
+  passed; `npm run dev` launched Electron/Vite and `http://localhost:5173/` returned HTTP 200
+  before shutdown. Live Pi smoke in a disposable git worktree confirmed `pi -p --no-tools
+  --no-session` returns `pr-rosey smoke ok` and `pi --mode rpc` accepts prompt messages, streams
+  JSONL events, responds to `get_state` with a session id, responds to `abort`, and leaves the repo
+  clean.
+- Smoke fix: Pi RPC expects `{ "type": "prompt", "message": "..." }`, not a `prompt` field. Updated
+  the runner payload, Pi session id capture, Pi session storage location, and event summarization for
+  observed `message_update` deltas.
+- Review: separate-agent review first found that existing managed worktree reuse did not verify the
+  worktree origin before mutation. Fixed with an origin check plus regression test; re-review found
+  no findings.
+- Remaining risk: live Pi smoke used a disposable fixture worktree, not a real GitHub PR worktree
+  with CI context and a long-running fix loop. Browser screenshot verification was unavailable
+  because the in-app Browser reported `iab` unavailable.
+
 ## 2026-06-04 Pi Managed Runner Planning Receipt
 
 - Approved scope: chat-approved documentation plan for moving pr-rosey toward a Pi-backed managed PR
@@ -48,14 +75,18 @@ into `docs/plans/completed/` when it matters later.
 ## Current State
 
 - There is no active product plan in `docs/plans/active/`.
-- Product scope remains local-first Electron PR monitoring for the current GitHub user.
+- Product scope is local-first Electron PR monitoring plus user-started Pi babysit sessions in
+  managed local worktrees.
 - Current implemented surface:
   - Dependency readiness checks for `gh`, `gh auth status`, and `git`.
+  - Pi runner readiness checks for install/auth/model signals without exposing secret values.
   - Authored open PR discovery through GitHub CLI and GraphQL search.
   - Review-requested open PR discovery through GitHub CLI and GraphQL search.
   - CI status rollup display for PR head commits.
   - Manual refresh for authored and review-requested PR sections, plus PR URL
     browser handoff through typed preload IPC.
+  - Babysit action for a selected PR, managed worktree creation/reuse, Pi RPC session state,
+    visible runner output summaries, abort, and durable local session logs.
   - Full-window Electron renderer shell with readiness and pull-request panels.
 
 ## Latest Verified Evidence

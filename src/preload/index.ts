@@ -11,6 +11,12 @@ const api: PrRoseyApi = {
       ipcRenderer.invoke(ipcChannels.fetchReviewRequestedPullRequests),
     openUrl: (url) => ipcRenderer.invoke(ipcChannels.openPullRequestUrl, url),
   },
+  runner: {
+    checkPiReadiness: () => ipcRenderer.invoke(ipcChannels.checkPiRunnerReadiness),
+    startBabysit: (request) => ipcRenderer.invoke(ipcChannels.startBabysitSession, request),
+    abort: () => ipcRenderer.invoke(ipcChannels.abortBabysitSession),
+    getCurrentSession: () => ipcRenderer.invoke(ipcChannels.getBabysitSession),
+  },
 };
 
 contextBridge.exposeInMainWorld("prRosey", api);

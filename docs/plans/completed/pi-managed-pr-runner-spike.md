@@ -88,13 +88,28 @@ worktree.
 
 ## Handoff Notes
 
-- Keep the first implementation narrow. A fake Pi RPC process is acceptable for automated tests.
-- Prefer a subprocess integration first. Move to the Pi SDK only after the UI and state model settle.
-- Keep auth detection redacted; renderer state should say where auth was found, not what it is.
+- Implemented a narrow subprocess-backed Pi RPC spike with managed worktree creation/reuse, typed
+  runner IPC, renderer session state, abort, and durable session metadata/log files.
+- Local repository mapping is intentionally minimal for the spike: the renderer asks for an absolute
+  trusted repo path and the main process validates it before creating or reusing a managed worktree.
+- Existing managed worktrees are refused when dirty or when their origin does not match the selected
+  PR repository.
+- Verification passed: `npm test -- --run src/main/gitWorktreeService.test.ts`, `npm run check`,
+  and `npm run dev` with `http://localhost:5173/` returning HTTP 200 before shutdown.
+- Live Pi smoke passed in a disposable git worktree. `pi -p --no-tools --no-session` returned
+  `pr-rosey smoke ok`; `pi --mode rpc` accepted `{ "type": "prompt", "message": "..." }`, streamed
+  assistant JSONL events, returned `pr-rosey smoke ok`, responded to `get_state` with a session id,
+  responded to `abort`, and left the fixture repo clean.
+- Smoke testing found the initial app payload used `prompt` instead of Pi's required `message` field.
+  The runner now sends `message`, requests `get_state`, records Pi's session id, and summarizes
+  `message_update` deltas without dumping raw nested payloads into renderer state.
+- Separate-agent review first found the existing-worktree origin safety gap; after the fix and
+  regression test, re-review found no findings.
+- Remaining risk: live smoke used a disposable fixture worktree, not a real GitHub PR worktree with
+  CI context and a long-running fix loop.
 - Stop after this spike and wait for explicit approval before adding push/comment/CI automation.
 
 ## Approval Checkpoint
 
 Stop after reporting acceptance criteria. Do not continue to adjacent product work without explicit
 human approval.
-

@@ -14,8 +14,10 @@ type PullRequestSectionState = {
   error: string | null;
   isRefreshing: boolean;
   openingUrl: string | null;
+  startingBabysitUrl: string | null;
   openPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
   refresh: () => Promise<void>;
+  startBabysit: (pullRequest: PullRequestSummary) => Promise<void>;
 };
 
 type PullRequestSectionCopy = {
@@ -169,7 +171,9 @@ function PullRequestSection({ kind, state }: PullRequestSectionProps) {
         kind={kind}
         openingPullRequestUrl={state.openingUrl}
         pullRequests={pullRequests}
+        startingBabysitUrl={state.startingBabysitUrl}
         onOpenPullRequest={state.openPullRequest}
+        onStartBabysit={state.startBabysit}
       />
     </section>
   );
@@ -191,7 +195,9 @@ interface PullRequestListProps {
   kind: PullRequestSectionKind;
   openingPullRequestUrl: string | null;
   pullRequests: PullRequestSummary[];
+  startingBabysitUrl: string | null;
   onOpenPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
+  onStartBabysit: (pullRequest: PullRequestSummary) => Promise<void>;
 }
 
 function PullRequestList({
@@ -200,15 +206,17 @@ function PullRequestList({
   kind,
   openingPullRequestUrl,
   pullRequests,
+  startingBabysitUrl,
   onOpenPullRequest,
+  onStartBabysit,
 }: PullRequestListProps) {
   return (
     <div>
-      <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 border-y border-line bg-panel/30 px-4 py-2 text-xs font-medium text-muted sm:grid-cols-[minmax(0,1fr)_6rem_7rem_5.5rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-3 border-y border-line bg-panel/30 px-4 py-2 text-xs font-medium text-muted sm:grid-cols-[minmax(0,1fr)_6rem_7rem_10rem]">
         <span>Pull request</span>
         <span>Status</span>
         <span className="hidden sm:block">CI</span>
-        <span className="text-right">Action</span>
+        <span className="text-right">Actions</span>
       </div>
 
       {isInitialLoading ? <PullRequestLoadingRows label={sectionCopy[kind].loadingText} /> : null}
@@ -222,10 +230,12 @@ function PullRequestList({
           {pullRequests.map((pullRequest) => (
             <PullRequestRow
               isOpening={openingPullRequestUrl === pullRequest.url}
+              isStartingBabysit={startingBabysitUrl === pullRequest.url}
               key={pullRequest.url}
               kind={kind}
               pullRequest={pullRequest}
               onOpenPullRequest={onOpenPullRequest}
+              onStartBabysit={onStartBabysit}
             />
           ))}
         </div>
@@ -244,7 +254,7 @@ function PullRequestLoadingRows({ label }: PullRequestLoadingRowsProps) {
       <p className="sr-only">{label}</p>
       {loadingRowIds.map((rowId) => (
         <div
-          className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_6rem_7rem_5.5rem]"
+          className="grid grid-cols-[minmax(0,1fr)_8rem] gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_6rem_7rem_10rem]"
           key={rowId}
         >
           <div className="min-w-0 space-y-2">
@@ -286,14 +296,23 @@ function EmptyPullRequests({ kind }: EmptyPullRequestsProps) {
 
 interface PullRequestRowProps {
   isOpening: boolean;
+  isStartingBabysit: boolean;
   kind: PullRequestSectionKind;
   pullRequest: PullRequestSummary;
   onOpenPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
+  onStartBabysit: (pullRequest: PullRequestSummary) => Promise<void>;
 }
 
-function PullRequestRow({ isOpening, kind, pullRequest, onOpenPullRequest }: PullRequestRowProps) {
+function PullRequestRow({
+  isOpening,
+  isStartingBabysit,
+  kind,
+  pullRequest,
+  onOpenPullRequest,
+  onStartBabysit,
+}: PullRequestRowProps) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 px-4 py-3 text-sm hover:bg-panel/45 sm:grid-cols-[minmax(0,1fr)_6rem_7rem_5.5rem]">
+    <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-3 px-4 py-3 text-sm hover:bg-panel/45 sm:grid-cols-[minmax(0,1fr)_6rem_7rem_10rem]">
       <div className="min-w-0">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
           <p className="truncate font-medium text-ink">{pullRequest.title}</p>
@@ -314,7 +333,17 @@ function PullRequestRow({ isOpening, kind, pullRequest, onOpenPullRequest }: Pul
         <PullRequestCiStatusIndicator status={pullRequest.ciStatus} />
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <button
+          className={tokens.button.primary}
+          disabled={isStartingBabysit}
+          type="button"
+          onClick={() => {
+            void onStartBabysit(pullRequest);
+          }}
+        >
+          {isStartingBabysit ? "Starting" : "Babysit"}
+        </button>
         <button
           className={tokens.button.secondary}
           disabled={isOpening}
@@ -398,7 +427,7 @@ function ReadinessFooter({ checkedAt, summary }: ReadinessFooterProps) {
   return (
     <footer className="border-t border-line bg-panel/70 px-4 py-2 text-xs text-muted">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p>{summary} Polling, prompt generation, and agent handoff remain out of scope.</p>
+        <p>{summary} Babysit runs only in a managed local worktree.</p>
         <span>Last check: {checkedAt}</span>
       </div>
     </footer>

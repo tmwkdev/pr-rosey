@@ -5,6 +5,8 @@ import {
 } from "@/renderer/features/pull-requests/useAuthoredPullRequests";
 import ReadinessPanel from "@/renderer/features/readiness/ReadinessPanel";
 import { useDependencyReadiness } from "@/renderer/features/readiness/useDependencyReadiness";
+import RunnerSessionPanel from "@/renderer/features/runner/RunnerSessionPanel";
+import { useBabysitSession } from "@/renderer/features/runner/useBabysitSession";
 import { tokens } from "@/styles/tokens";
 
 interface AppToolbarProps {
@@ -55,6 +57,7 @@ export function App() {
   const readiness = useDependencyReadiness();
   const authoredPullRequests = useAuthoredPullRequests();
   const reviewRequestedPullRequests = useReviewRequestedPullRequests();
+  const babysitSession = useBabysitSession();
   const isRefreshingPullRequests =
     authoredPullRequests.isRefreshing || reviewRequestedPullRequests.isRefreshing;
 
@@ -81,11 +84,28 @@ export function App() {
         />
 
         <main className="min-h-0 flex-1 overflow-auto">
+          <RunnerSessionPanel
+            error={babysitSession.error}
+            isAborting={babysitSession.isAborting}
+            isCheckingReadiness={babysitSession.isCheckingReadiness}
+            readiness={babysitSession.readiness}
+            session={babysitSession.session}
+            onAbortSession={babysitSession.abortSession}
+            onCheckReadiness={babysitSession.checkReadiness}
+          />
           <PullRequestsPanel
-            authored={authoredPullRequests}
+            authored={{
+              ...authoredPullRequests,
+              startingBabysitUrl: babysitSession.startingPullRequestUrl,
+              startBabysit: babysitSession.startBabysit,
+            }}
             checkedAt={readiness.checkedAt}
             readinessSummaryText={readiness.summary}
-            reviewRequested={reviewRequestedPullRequests}
+            reviewRequested={{
+              ...reviewRequestedPullRequests,
+              startingBabysitUrl: babysitSession.startingPullRequestUrl,
+              startBabysit: babysitSession.startBabysit,
+            }}
           />
         </main>
       </div>

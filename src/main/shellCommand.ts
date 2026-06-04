@@ -12,22 +12,36 @@ export type ShellCommandError = Error & {
   stderr?: string;
 };
 
-export function runShellCommand(command: string, args: string[] = []): Promise<ShellCommandResult> {
-  return new Promise((resolve, reject) => {
-    execFile(command, args, { timeout: 15_000 }, (error, stdout, stderr) => {
-      if (error) {
-        const shellError = error as ShellCommandError;
-        shellError.stdout = stdout;
-        shellError.stderr = stderr;
-        reject(shellError);
-        return;
-      }
+export type ShellCommandOptions = {
+  cwd?: string;
+  timeoutMs?: number;
+};
 
-      resolve({
-        exitCode: 0,
-        stdout,
-        stderr,
-      });
-    });
+export function runShellCommand(
+  command: string,
+  args: string[] = [],
+  options: ShellCommandOptions = {},
+): Promise<ShellCommandResult> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      command,
+      args,
+      { cwd: options.cwd, timeout: options.timeoutMs ?? 15_000 },
+      (error, stdout, stderr) => {
+        if (error) {
+          const shellError = error as ShellCommandError;
+          shellError.stdout = stdout;
+          shellError.stderr = stderr;
+          reject(shellError);
+          return;
+        }
+
+        resolve({
+          exitCode: 0,
+          stdout,
+          stderr,
+        });
+      },
+    );
   });
 }
