@@ -47,6 +47,8 @@ const sectionCopy: Record<PullRequestSectionKind, PullRequestSectionCopy> = {
   },
 };
 
+const loadingRowIds = ["primary-loading-row", "secondary-loading-row"] as const;
+
 function formatTimestamp(timestamp: string): string {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -97,12 +99,12 @@ export function PullRequestsPanel({
             <p className={tokens.label.eyebrow}>Pull request inbox</p>
             <h2 className="mt-1 text-base font-semibold text-ink">Open pull requests</h2>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <InboxFilterChip
+          <div className="flex flex-wrap justify-end gap-x-4 gap-y-1 text-xs text-muted">
+            <InboxCountMetadata
               count={authored.discovery?.pullRequests.length}
               label="Authored by me"
             />
-            <InboxFilterChip
+            <InboxCountMetadata
               count={reviewRequested.discovery?.pullRequests.length}
               label="Review requested"
             />
@@ -118,18 +120,18 @@ export function PullRequestsPanel({
   );
 }
 
-interface InboxFilterChipProps {
+interface InboxCountMetadataProps {
   count: number | undefined;
   label: string;
 }
 
-function InboxFilterChip({ count, label }: InboxFilterChipProps) {
+function InboxCountMetadata({ count, label }: InboxCountMetadataProps) {
   const countText = typeof count === "number" ? count.toString() : "-";
 
   return (
-    <span className={`${tokens.badge.base} border-line bg-paper text-muted`}>
+    <span className="inline-flex items-baseline gap-2">
       {label}
-      <span className="ml-2 font-mono text-ink">{countText}</span>
+      <span className={tokens.text.monoMeta}>{countText}</span>
     </span>
   );
 }
@@ -209,9 +211,7 @@ function PullRequestList({
         <span className="text-right">Action</span>
       </div>
 
-      {isInitialLoading ? (
-        <div className="px-4 py-8 text-sm text-muted">{sectionCopy[kind].loadingText}</div>
-      ) : null}
+      {isInitialLoading ? <PullRequestLoadingRows label={sectionCopy[kind].loadingText} /> : null}
 
       {!isInitialLoading && !hasError && pullRequests.length === 0 ? (
         <EmptyPullRequests kind={kind} />
@@ -230,6 +230,41 @@ function PullRequestList({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+interface PullRequestLoadingRowsProps {
+  label: string;
+}
+
+function PullRequestLoadingRows({ label }: PullRequestLoadingRowsProps) {
+  return (
+    <div aria-live="polite" aria-label={label} className="divide-y divide-line" role="status">
+      <p className="sr-only">{label}</p>
+      {loadingRowIds.map((rowId) => (
+        <div
+          className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_6rem_7rem_5.5rem]"
+          key={rowId}
+        >
+          <div className="min-w-0 space-y-2">
+            <div className="h-4 w-3/4 rounded bg-faint/25" />
+            <div className="flex gap-3">
+              <div className="h-3 w-24 rounded bg-faint/20" />
+              <div className="h-3 w-16 rounded bg-faint/20" />
+              <div className="h-3 w-28 rounded bg-faint/20" />
+            </div>
+          </div>
+          <div className="h-4 w-12 rounded bg-faint/20" />
+          <div className="hidden min-w-0 space-y-2 sm:block">
+            <div className="h-4 w-16 rounded bg-faint/20" />
+            <div className="h-3 w-full rounded bg-faint/15" />
+          </div>
+          <div className="flex justify-end">
+            <div className="h-9 w-16 rounded-md bg-faint/15" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -274,9 +309,9 @@ function PullRequestRow({ isOpening, kind, pullRequest, onOpenPullRequest }: Pul
         </div>
       </div>
 
-      <PullRequestStatusBadge isDraft={pullRequest.isDraft} kind={kind} />
+      <PullRequestObjectStatus isDraft={pullRequest.isDraft} />
       <div className="hidden min-w-0 sm:block">
-        <PullRequestCiStatusBadge status={pullRequest.ciStatus} />
+        <PullRequestCiStatusIndicator status={pullRequest.ciStatus} />
       </div>
 
       <div className="flex justify-end">
@@ -295,35 +330,38 @@ function PullRequestRow({ isOpening, kind, pullRequest, onOpenPullRequest }: Pul
   );
 }
 
-interface PullRequestStatusBadgeProps {
+interface PullRequestObjectStatusProps {
   isDraft: boolean;
-  kind: PullRequestSectionKind;
 }
 
-function PullRequestStatusBadge({ isDraft, kind }: PullRequestStatusBadgeProps) {
-  const statusClassName = isDraft
-    ? "border-amber-300/30 bg-amber-300/10 text-amber-200"
-    : "border-moss/25 bg-moss/10 text-moss";
-  const label = isDraft ? "Draft" : kind === "review-requested" ? "Review" : "Open";
+function PullRequestObjectStatus({ isDraft }: PullRequestObjectStatusProps) {
+  if (isDraft) {
+    return (
+      <span className={`${tokens.badge.base} border-amber-300/30 bg-amber-300/10 text-amber-200`}>
+        Draft
+      </span>
+    );
+  }
 
-  return <span className={`${tokens.badge.base} ${statusClassName}`}>{label}</span>;
+  return <span className="text-sm text-muted">Open</span>;
 }
 
 interface PullRequestCiStatusProps {
   status: PullRequestCiStatus;
 }
 
-function PullRequestCiStatusBadge({ status }: PullRequestCiStatusProps) {
-  const statusClassName = getCiStatusClassName(status.state);
+function PullRequestCiStatusIndicator({ status }: PullRequestCiStatusProps) {
+  const statusDotClassName = getCiStatusDotClassName(status.state);
   const visibleChecks = status.checks
     .filter((check) => check.state === "failing" || check.state === "pending")
     .slice(0, 2);
 
   return (
     <div className="min-w-0">
-      <span className={`${tokens.badge.base} ${statusClassName}`}>
-        {ciStatusLabels[status.state]}
-      </span>
+      <div className={tokens.status.item}>
+        <span aria-hidden="true" className={`${tokens.status.dot} ${statusDotClassName}`} />
+        <span className={tokens.status.label}>{ciStatusLabels[status.state]}</span>
+      </div>
       <p className="mt-1 truncate text-xs text-muted">{formatCiStatusSummary(status)}</p>
 
       {visibleChecks.length > 0 ? (
@@ -335,19 +373,19 @@ function PullRequestCiStatusBadge({ status }: PullRequestCiStatusProps) {
   );
 }
 
-function getCiStatusClassName(status: PullRequestCiStatus["state"]): string {
+function getCiStatusDotClassName(status: PullRequestCiStatus["state"]): string {
   switch (status) {
     case "passing":
-      return tokens.status.ready;
+      return tokens.statusDot.ready;
     case "failing":
-      return tokens.status.missing;
+      return tokens.statusDot.missing;
     case "pending":
-      return tokens.status.loading;
+      return tokens.statusDot.loading;
     case "error":
-      return tokens.status.error;
+      return tokens.statusDot.error;
     case "no-checks":
     case "unknown":
-      return tokens.status.unknown;
+      return tokens.statusDot.unknown;
   }
 }
 

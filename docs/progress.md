@@ -4,6 +4,27 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-03 Frontend Guidance Cleanup Receipt
+
+- Approved scope: chat-approved renderer cleanup based on the updated frontend
+  component guidance, with audit, implementation, and separate-agent review.
+- Changed: added `docs/frontend-guidance-audit.md`, replaced inbox count badges
+  with quiet metadata, changed readiness dependencies and CI state to
+  status-dot-plus-label indicators, kept only `Draft` as a PR object badge, added
+  local PR loading skeleton rows, and tightened status tokens away from generic
+  pill/badge usage.
+- Files changed: `docs/frontend-guidance-audit.md`,
+  `src/renderer/features/pull-requests/PullRequestsPanel.tsx`,
+  `src/renderer/features/readiness/ReadinessPanel.tsx`,
+  `src/styles/tokens.ts`, and this progress note.
+- Verification: `npm run check` passed; `npm run dev` launched Electron/Vite and
+  `http://localhost:5173/` returned 200 before shutdown.
+- Remaining risk: in-app Browser verification could not run because the
+  Node/browser automation tool was not discoverable in this session.
+- Review: separate-agent review found no behavior or boundary issues. Reviewer
+  noted `docs/frontend-guidance-audit.md` is untracked until included in a
+  future commit.
+
 ## Native App UI Refresh
 
 - Approved scope: chat-approved renderer UI update to make the Electron app feel like a native full-window app instead of a website-style page with sidebars.
@@ -25,11 +46,12 @@ into `docs/plans/completed/` when it matters later.
   - Manual refresh for authored and review-requested PR sections, plus PR URL
     browser handoff through typed preload IPC.
   - Full-window Electron renderer shell with readiness and pull-request panels.
-- `AGENTS.md` is modified in the worktree from outside this cleanup and should be
-  treated as user-owned unless a future approved task includes it.
 
 ## Latest Verified Evidence
 
+- `npm run check` passed after the frontend guidance cleanup; `npm run dev`
+  launched Electron/Vite and `http://localhost:5173/` returned 200 before
+  shutdown.
 - `npm run check` passed after the review-requested PR inbox update; the
   separate reviewer also reran `npm run check` successfully.
 - `npm run dev` launched Electron/Vite after the review-requested PR inbox

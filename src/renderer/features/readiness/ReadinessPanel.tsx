@@ -27,7 +27,7 @@ export function ReadinessPanel({ checkedAt, dependencies, isChecking }: Readines
 
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {dependencies.map((dependency) => (
-            <DependencyStatusPill
+            <DependencyStatusItem
               dependency={dependency}
               isChecking={isChecking}
               key={dependency.id}
@@ -39,37 +39,36 @@ export function ReadinessPanel({ checkedAt, dependencies, isChecking }: Readines
   );
 }
 
-interface DependencyStatusPillProps {
+interface DependencyStatusItemProps {
   dependency: DependencyCheckResult;
   isChecking: boolean;
 }
 
-function DependencyStatusPill({ dependency, isChecking }: DependencyStatusPillProps) {
+function DependencyStatusItem({ dependency, isChecking }: DependencyStatusItemProps) {
   return (
-    <div
-      className={`inline-flex max-w-full items-center gap-2 rounded-full border px-2.5 py-1 text-xs ${getDependencyStatusClassName(
-        dependency.status,
-      )}`}
-      title={dependency.message}
-    >
-      <span className="truncate font-medium">{dependency.label}</span>
-      <span className="font-mono">{isChecking ? "checking" : dependency.status}</span>
+    <div className={tokens.status.item} title={dependency.message}>
+      <span
+        aria-hidden="true"
+        className={`${tokens.status.dot} ${getDependencyStatusDotClassName(dependency.status)}`}
+      />
+      <span className={tokens.status.label}>{dependency.label}</span>
+      <span className={tokens.status.value}>{isChecking ? "checking" : dependency.status}</span>
     </div>
   );
 }
 
-function getDependencyStatusClassName(status: DependencyCheckResult["status"]): string {
+function getDependencyStatusDotClassName(status: DependencyCheckResult["status"]): string {
   switch (status) {
     case "ready":
-      return tokens.status.ready;
+      return tokens.statusDot.ready;
     case "missing":
-      return tokens.status.missing;
+      return tokens.statusDot.missing;
     case "loading":
-      return tokens.status.loading;
+      return tokens.statusDot.loading;
     case "error":
-      return tokens.status.error;
+      return tokens.statusDot.error;
     case "unknown":
-      return tokens.status.unknown;
+      return tokens.statusDot.unknown;
   }
 }
 

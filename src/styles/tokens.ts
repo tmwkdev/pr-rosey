@@ -26,6 +26,7 @@ export const tokens = {
   },
   text: {
     meta: "text-xs text-muted",
+    monoMeta: "font-mono text-xs text-ink",
     mutedBody: "text-sm leading-6 text-muted",
   },
   input: {
@@ -35,11 +36,10 @@ export const tokens = {
     base: "space-y-2",
   },
   status: {
-    ready: "border-moss/25 bg-moss/10 text-moss",
-    missing: "border-rosey/25 bg-rosey/10 text-rosey",
-    error: "border-amber-400/25 bg-amber-400/10 text-amber-200",
-    loading: "border-muted/20 bg-white/[0.04] text-muted",
-    unknown: "border-muted/20 bg-white/[0.04] text-muted",
+    item: "inline-flex min-w-0 max-w-full items-center gap-2 text-xs",
+    dot: "size-2 shrink-0 rounded-full",
+    label: "truncate font-medium text-ink",
+    value: "shrink-0 font-mono text-muted",
   },
   statusDot: {
     ready: "bg-moss shadow-[0_0_16px_rgba(107,209,155,0.34)]",
