@@ -1,5 +1,6 @@
 # Active Plans
 
-There is no active product plan right now.
+Active product plans:
 
-Before starting new product work, add a concise approved work item here using `docs/plan-template.md`.
+- `pi-managed-pr-runner-spike.md` - prove Pi RPC can run in a managed local PR worktree with
+  visible session state and abort.

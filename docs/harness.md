@@ -19,8 +19,8 @@ The default order is:
 - Keep app behavior ahead of documentation. Do not write speculative docs for future features.
 - Update docs after useful behavior exists or when a boundary decision must be preserved.
 - Stop after each approved work item and wait for explicit human approval before continuing.
-- Do not add PR discovery, GitHub OAuth, hosted services, team accounts, or direct AI-agent execution
-  until an approved work item explicitly includes that scope.
+- Do not add GitHub OAuth, hosted services, team accounts, managed coding-agent execution, or
+  branch-affecting automation until an approved work item explicitly includes that scope.
 - After each completed implementation chunk, require review from a separate agent before reporting
   the work complete. The implementing agent can fix findings, but can never satisfy the review gate
   by reviewing its own work.
@@ -97,7 +97,9 @@ Before calling product work complete, confirm:
 - Preload exposes a minimal typed IPC boundary.
 - Renderer code owns React UI, visual state, and user interaction only.
 - Shared code contains types and pure helpers that are safe across the IPC boundary.
-- No hosted backend or direct coding-agent execution was added.
+- No hosted backend or unmanaged coding-agent execution was added.
+- Managed coding-agent execution, when approved, runs only through main-process supervision in an
+  approved workspace with visible state, durable logs, cancellation, and capability gates.
 - UI primitives reuse `src/styles/tokens.ts` where a token exists.
 - Renderer styling and component choices follow `docs/frontend.md`.
 - A separate reviewer agent reviewed the completed chunk, or the lack of review is explicitly
@@ -157,27 +159,27 @@ Use `docs/frontend.md` for renderer styling, component-selection, badge, status,
 token, state, and frontend dependency guidance. Keep this harness focused on workflow, gates,
 ownership boundaries, and verification.
 
-## Autonomy Readiness
+## Managed Runner Readiness
 
-pr-rosey should be easy to evolve toward more autonomous workflows later, but the current harness is
-human-approved and single-work-item oriented. The foundation to preserve is:
+pr-rosey is evolving toward managed PR runner workflows, but the harness remains human-approved and
+single-work-item oriented. The foundation to preserve is:
 
 - A compact root `AGENTS.md` for hard policy and routing.
 - Focused docs for product boundaries, architecture, plans, progress, and the harness.
 - Small repo-local skills for implementer and reviewer roles.
 - Work items that name scope, non-goals, touched surfaces, acceptance criteria, validation, and
   handoff notes.
-- Capability budgets for work that touches local system access, GitHub CLI calls, IPC, or future
-  agent workflow behavior.
+- Capability budgets for work that touches local system access, GitHub CLI calls, IPC, worktrees,
+  runner processes, credentials, or future agent workflow behavior.
 - Typed Electron boundaries that keep local system access in main, UI in renderer, and serializable
   contracts in shared code.
 - Proof-first closeout: targeted checks while iterating, `npm run check`, Electron manual
   verification when behavior changes, and separate-agent review.
 
-Do not treat autonomy as a feature until it is explicitly approved. Before adding any durable agent
-runtime, queue, scheduler, memory store, auto-review loop, or self-improving harness behavior, write
-an active plan that states the user value, safety boundary, recovery path, and validation approach.
-Prefer a disposable spike first when the implementation risk is unclear.
+Before adding any durable runner behavior, queue, scheduler, memory store, auto-review loop, or
+self-improving harness behavior, write an active plan that states the user value, safety boundary,
+recovery path, and validation approach. Prefer a disposable spike first when the implementation risk
+is unclear.
 
 ## Documentation Standard
 

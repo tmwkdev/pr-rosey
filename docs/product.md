@@ -3,9 +3,10 @@
 pr-rosey is a local-first Electron desktop app for monitoring the current GitHub user's open pull
 requests.
 
-Future product work may inspect CI state and help prepare useful prompts for external AI coding
-agents. The app must not directly execute coding agents, edit code, commit, push, merge, or use a
-hosted backend.
+Future product work may execute user-started coding-agent sessions for open PRs, but only inside an
+approved managed workspace such as a per-PR git worktree. The app must keep agent execution visible,
+logged, cancellable, and capability-gated. It must not use a hosted backend or automatically merge
+PRs.
 
 ## Current Product Surface
 
@@ -21,8 +22,10 @@ hosted backend.
 ## Not Yet Product Scope
 
 - Background CI polling or notifications.
-- Prompt generation.
+- Managed coding-agent runner execution.
+- Native coding-agent auth UI.
+- Prompt generation outside an approved runner work item.
 - GitHub OAuth or hosted auth.
 - Hosted backend or team accounts.
-- Direct AI-agent execution.
-- Automatic code editing, committing, pushing, or merging.
+- Automatic pushing, PR comments, review-thread resolution, CI reruns, or merging without an
+  explicit approved capability gate.

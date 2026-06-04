@@ -4,6 +4,17 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-04 Pi Managed Runner Planning Receipt
+
+- Approved scope: chat-approved documentation plan for moving pr-rosey toward a Pi-backed managed PR
+  runner using local worktrees and explicit capability gates.
+- Changed: added `docs/agent-runner.md`, added active plan
+  `docs/plans/active/pi-managed-pr-runner-spike.md`, updated product/harness boundaries so managed
+  runner execution is allowed only when approved, and updated the docs map.
+- Behavior changed: none; documentation-only planning and boundary update.
+- Verification: `npm run check` passed.
+- Review: separate-agent review was not performed for this docs-only planning update.
+
 ## 2026-06-03 Frontend Guidance Cleanup Receipt
 
 - Approved scope: chat-approved renderer cleanup based on the updated frontend
