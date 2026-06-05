@@ -44,6 +44,7 @@ export const tokens = {
     value: "shrink-0 font-mono text-muted",
   },
   statusDot: {
+    draft: "bg-faint",
     ready: "bg-moss shadow-[0_0_16px_rgba(107,209,155,0.34)]",
     missing: "bg-rosey shadow-[0_0_16px_rgba(230,95,115,0.3)]",
     error: "bg-amber-300 shadow-[0_0_16px_rgba(252,211,77,0.28)]",

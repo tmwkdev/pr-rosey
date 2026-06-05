@@ -22,6 +22,8 @@ into `docs/plans/completed/` when it matters later.
 - Review: separate-agent review found no blocking findings and independently ran `npm run check`.
   Reviewer also launched dev on `http://localhost:5174/` because 5173 was already in use, confirmed
   HTTP 200, and stopped that dev session.
+- Follow-up: after PR screenshot review, draft PR rows no longer show a title-adjacent `Draft`
+  label and use a grey PR-state dot instead of amber, matching common hoster status conventions.
 - Remaining risk: no in-app Browser screenshot was captured because the Browser plugin reported
   `Browser is not available: iab`; hover/focus visuals were verified by code review and dev-server
   smoke evidence rather than screenshot inspection.

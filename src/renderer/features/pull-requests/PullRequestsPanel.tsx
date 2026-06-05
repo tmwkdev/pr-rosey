@@ -248,9 +248,6 @@ function PullRequestRow({ isOpening, kind, pullRequest, onOpenPullRequest }: Pul
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
               <p className="truncate font-medium text-ink">{pullRequest.title}</p>
-              {pullRequest.isDraft ? (
-                <span className="text-xs font-medium text-amber-200">Draft</span>
-              ) : null}
             </div>
             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
               <span className="truncate">{pullRequest.repository.nameWithOwner}</span>
@@ -295,14 +292,13 @@ interface PullRequestStateMarkProps {
 }
 
 function PullRequestStateMark({ isDraft }: PullRequestStateMarkProps) {
-  const statusDotClassName = isDraft
-    ? "bg-amber-300 shadow-[0_0_16px_rgba(252,211,77,0.28)]"
-    : tokens.statusDot.ready;
+  const statusDotClassName = isDraft ? tokens.statusDot.draft : tokens.statusDot.ready;
 
   return (
     <span
-      aria-hidden="true"
+      aria-label={isDraft ? "Draft pull request" : "Open pull request"}
       className={`mt-1 size-2.5 shrink-0 rounded-full ${statusDotClassName}`}
+      role="img"
     />
   );
 }
