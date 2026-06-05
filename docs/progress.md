@@ -4,6 +4,30 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-05 PR List UI Simplification Receipt
+
+- Approved scope: chat-approved renderer simplification based on GitHub/GitLab-style PR list
+  references, reducing visual chrome while keeping hover/focus affordances for secondary detail and
+  actions.
+- Changed: collapsed the app toolbar into quiet counts and actions, made readiness a slimmer
+  secondary strip, removed the PR table header/footer chrome, reshaped PR rows into cleaner list
+  items, moved branch/check detail and row action visibility to hover/focus states, and added a quiet
+  button token.
+- Files changed: `src/renderer/App.tsx`,
+  `src/renderer/features/pull-requests/PullRequestsPanel.tsx`,
+  `src/renderer/features/readiness/ReadinessPanel.tsx`, `src/styles/tokens.ts`, and this progress
+  note.
+- Verification: `npm run check` passed; `npm run build` passed; `npm run dev` launched
+  Electron/Vite and `http://localhost:5173/` returned 200 before shutdown.
+- Review: separate-agent review found no blocking findings and independently ran `npm run check`.
+  Reviewer also launched dev on `http://localhost:5174/` because 5173 was already in use, confirmed
+  HTTP 200, and stopped that dev session.
+- Follow-up: after PR screenshot review, draft PR rows no longer show a title-adjacent `Draft`
+  label and use a grey PR-state dot instead of amber, matching common hoster status conventions.
+- Remaining risk: no in-app Browser screenshot was captured because the Browser plugin reported
+  `Browser is not available: iab`; hover/focus visuals were verified by code review and dev-server
+  smoke evidence rather than screenshot inspection.
+
 ## 2026-06-04 Pi Managed Runner Planning Receipt
 
 - Approved scope: chat-approved documentation plan for moving pr-rosey toward a Pi-backed managed PR
