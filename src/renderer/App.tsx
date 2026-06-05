@@ -8,30 +8,36 @@ import { useDependencyReadiness } from "@/renderer/features/readiness/useDepende
 import { tokens } from "@/styles/tokens";
 
 interface AppToolbarProps {
+  authoredCount: number | undefined;
   isCheckingReadiness: boolean;
   isRefreshingPullRequests: boolean;
+  reviewRequestCount: number | undefined;
   readinessSummaryText: string;
   onRefreshPullRequests: () => void;
   onRunReadinessChecks: () => void;
 }
 
 function AppToolbar({
+  authoredCount,
   isCheckingReadiness,
   isRefreshingPullRequests,
+  reviewRequestCount,
   readinessSummaryText,
   onRefreshPullRequests,
   onRunReadinessChecks,
 }: AppToolbarProps) {
   return (
-    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-panel/95 px-4 py-3">
-      <div className="min-w-0">
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-paper px-5 py-3">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-5 gap-y-1">
         <h1 className="truncate text-sm font-semibold text-ink">pr-rosey</h1>
-        <p className={tokens.text.meta}>{readinessSummaryText}</p>
+        <ToolbarCount count={authoredCount} label="Open work" />
+        <ToolbarCount count={reviewRequestCount} label="Needs review" />
+        <p className="min-w-0 truncate text-xs text-muted">{readinessSummaryText}</p>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
         <button
-          className={tokens.button.secondary}
+          className={tokens.button.quiet}
           disabled={isCheckingReadiness}
           type="button"
           onClick={onRunReadinessChecks}
@@ -39,7 +45,7 @@ function AppToolbar({
           {isCheckingReadiness ? "Checking" : "Check tools"}
         </button>
         <button
-          className={tokens.button.primary}
+          className={tokens.button.quiet}
           disabled={isRefreshingPullRequests}
           type="button"
           onClick={onRefreshPullRequests}
@@ -48,6 +54,20 @@ function AppToolbar({
         </button>
       </div>
     </header>
+  );
+}
+
+interface ToolbarCountProps {
+  count: number | undefined;
+  label: string;
+}
+
+function ToolbarCount({ count, label }: ToolbarCountProps) {
+  return (
+    <span className="inline-flex items-baseline gap-2 text-sm text-muted">
+      <span className="font-medium text-ink">{typeof count === "number" ? count : "-"}</span>
+      {label}
+    </span>
   );
 }
 
@@ -67,8 +87,10 @@ export function App() {
     <div className="h-screen w-screen overflow-hidden bg-canvas text-ink">
       <div className="flex h-full min-h-0 flex-col">
         <AppToolbar
+          authoredCount={authoredPullRequests.discovery?.pullRequests.length}
           isCheckingReadiness={readiness.isChecking}
           isRefreshingPullRequests={isRefreshingPullRequests}
+          reviewRequestCount={reviewRequestedPullRequests.discovery?.pullRequests.length}
           readinessSummaryText={readiness.summary}
           onRefreshPullRequests={refreshPullRequests}
           onRunReadinessChecks={readiness.runChecks}
@@ -83,8 +105,6 @@ export function App() {
         <main className="min-h-0 flex-1 overflow-auto">
           <PullRequestsPanel
             authored={authoredPullRequests}
-            checkedAt={readiness.checkedAt}
-            readinessSummaryText={readiness.summary}
             reviewRequested={reviewRequestedPullRequests}
           />
         </main>

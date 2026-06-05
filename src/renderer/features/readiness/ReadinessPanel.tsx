@@ -14,12 +14,12 @@ export function ReadinessPanel({ checkedAt, dependencies, isChecking }: Readines
   ).length;
 
   return (
-    <section className="shrink-0 border-b border-line bg-canvas px-4 py-3">
+    <section className="shrink-0 border-b border-line bg-paper px-5 py-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-          <span className="font-medium text-ink">Local tools</span>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span className="font-medium text-muted">Local tools</span>
           <span className={tokens.text.meta}>{readyCount} ready</span>
-          <span className={issueCount > 0 ? "text-rust" : tokens.text.meta}>
+          <span className={issueCount > 0 ? "text-rosey" : tokens.text.meta}>
             {issueCount} blocked
           </span>
           <span className={tokens.text.meta}>Last check: {checkedAt}</span>
@@ -46,7 +46,10 @@ interface DependencyStatusItemProps {
 
 function DependencyStatusItem({ dependency, isChecking }: DependencyStatusItemProps) {
   return (
-    <div className={tokens.status.item} title={dependency.message}>
+    <div
+      className={`${tokens.status.item} opacity-75 transition hover:opacity-100`}
+      title={dependency.message}
+    >
       <span
         aria-hidden="true"
         className={`${tokens.status.dot} ${getDependencyStatusDotClassName(dependency.status)}`}

@@ -2,6 +2,8 @@ export const tokens = {
   button: {
     primary:
       "inline-flex min-h-9 items-center justify-center rounded-md border border-moss/35 bg-moss/15 px-3.5 py-2 text-sm font-medium text-moss shadow-sm shadow-black/20 transition hover:border-moss/55 hover:bg-moss/20 focus:outline-none focus:ring-2 focus:ring-moss/35 focus:ring-offset-2 focus:ring-offset-paper disabled:cursor-not-allowed disabled:opacity-55",
+    quiet:
+      "inline-flex min-h-8 items-center justify-center rounded-md border border-transparent bg-transparent px-3 py-1.5 text-sm font-medium text-muted transition hover:border-line hover:bg-panel hover:text-ink focus:outline-none focus:ring-2 focus:ring-moss/30 focus:ring-offset-2 focus:ring-offset-paper disabled:cursor-not-allowed disabled:opacity-55",
     secondary:
       "inline-flex min-h-9 items-center justify-center rounded-md border border-line bg-panel px-3.5 py-2 text-sm font-medium text-ink shadow-sm shadow-black/20 transition hover:border-faint hover:bg-white/[0.04] focus:outline-none focus:ring-2 focus:ring-moss/30 focus:ring-offset-2 focus:ring-offset-paper disabled:cursor-not-allowed disabled:opacity-55",
   },
