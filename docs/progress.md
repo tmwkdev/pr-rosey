@@ -4,6 +4,25 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-05 Settings Page Placeholder Receipt
+
+- Approved scope: chat-approved settings placeholder page that is distinct from the PR landing page
+  and reachable via the typical native settings shortcut.
+- Changed: added a native Electron Settings menu item with `CommandOrControl+,`, a typed one-way
+  navigation IPC event, hash-based renderer page switching, and a placeholder settings page with a
+  return link to pull requests.
+- Files changed: `src/main/index.ts`, `src/preload/index.ts`, `src/shared/ipc.ts`,
+  `src/renderer/App.tsx`, `src/renderer/features/settings/SettingsPage.tsx`, and this progress
+  note.
+- Verification: `npm run check` passed; `npm run dev` launched Electron/Vite and
+  `http://localhost:5174/` returned 200 before shutdown.
+- Review: separate-agent review found no blocking findings, reran `npm run check`, launched dev on
+  `http://localhost:5175/` because 5173/5174 were occupied, and confirmed `/` plus `/#settings`
+  returned HTTP 200.
+- Remaining risk: native menu accelerator behavior was verified by code review and dev launch, not
+  by an actual hotkey interaction; in-app Browser verification failed with
+  `Browser is not available: iab`.
+
 ## 2026-06-05 PR List UI Simplification Receipt
 
 - Approved scope: chat-approved renderer simplification based on GitHub/GitLab-style PR list
