@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import PullRequestsPanel from "@/renderer/features/pull-requests/PullRequestsPanel";
 import {
   useAuthoredPullRequests,
@@ -5,7 +6,14 @@ import {
 } from "@/renderer/features/pull-requests/useAuthoredPullRequests";
 import ReadinessPanel from "@/renderer/features/readiness/ReadinessPanel";
 import { useDependencyReadiness } from "@/renderer/features/readiness/useDependencyReadiness";
+import SettingsPage from "@/renderer/features/settings/SettingsPage";
 import { tokens } from "@/styles/tokens";
+
+type AppRoute = "pull-requests" | "settings";
+
+function getRouteFromHash(): AppRoute {
+  return window.location.hash === "#settings" ? "settings" : "pull-requests";
+}
 
 interface AppToolbarProps {
   authoredCount: number | undefined;
@@ -72,6 +80,7 @@ function ToolbarCount({ count, label }: ToolbarCountProps) {
 }
 
 export function App() {
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => getRouteFromHash());
   const readiness = useDependencyReadiness();
   const authoredPullRequests = useAuthoredPullRequests();
   const reviewRequestedPullRequests = useReviewRequestedPullRequests();
@@ -82,6 +91,25 @@ export function App() {
     void authoredPullRequests.refresh();
     void reviewRequestedPullRequests.refresh();
   };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentRoute(getRouteFromHash());
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    return window.prRosey.navigation.onOpenSettingsPage(() => {
+      setCurrentRoute("settings");
+      window.location.hash = "settings";
+    });
+  }, []);
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-canvas text-ink">
@@ -96,18 +124,26 @@ export function App() {
           onRunReadinessChecks={readiness.runChecks}
         />
 
-        <ReadinessPanel
-          checkedAt={readiness.checkedAt}
-          dependencies={readiness.dependencies}
-          isChecking={readiness.isChecking}
-        />
+        {currentRoute === "settings" ? (
+          <main className="min-h-0 flex-1 overflow-auto">
+            <SettingsPage />
+          </main>
+        ) : (
+          <>
+            <ReadinessPanel
+              checkedAt={readiness.checkedAt}
+              dependencies={readiness.dependencies}
+              isChecking={readiness.isChecking}
+            />
 
-        <main className="min-h-0 flex-1 overflow-auto">
-          <PullRequestsPanel
-            authored={authoredPullRequests}
-            reviewRequested={reviewRequestedPullRequests}
-          />
-        </main>
+            <main className="min-h-0 flex-1 overflow-auto">
+              <PullRequestsPanel
+                authored={authoredPullRequests}
+                reviewRequested={reviewRequestedPullRequests}
+              />
+            </main>
+          </>
+        )}
       </div>
     </div>
   );

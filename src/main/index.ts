@@ -1,6 +1,13 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  type MenuItemConstructorOptions,
+  shell,
+} from "electron";
 import { checkDependencies } from "@/main/dependencyCheckService";
 import {
   fetchAuthoredOpenPullRequests,
@@ -12,6 +19,51 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const appRoot = path.resolve(__dirname, "../..");
 const preloadPath = path.join(__dirname, "../preload/index.cjs");
+
+function openSettingsPage(): void {
+  const targetWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+
+  targetWindow?.webContents.send(ipcChannels.openSettingsPage);
+}
+
+function createApplicationMenu(): Menu {
+  const settingsMenuItem: MenuItemConstructorOptions = {
+    label: "Settings...",
+    accelerator: "CommandOrControl+,",
+    click: openSettingsPage,
+  };
+  const appOrFileMenu: MenuItemConstructorOptions =
+    process.platform === "darwin"
+      ? {
+          label: app.name,
+          submenu: [
+            { role: "about" },
+            { type: "separator" },
+            settingsMenuItem,
+            { type: "separator" },
+            { role: "services" },
+            { type: "separator" },
+            { role: "hide" },
+            { role: "hideOthers" },
+            { role: "unhide" },
+            { type: "separator" },
+            { role: "quit" },
+          ],
+        }
+      : {
+          label: "File",
+          submenu: [settingsMenuItem, { type: "separator" }, { role: "quit" }],
+        };
+
+  const template: MenuItemConstructorOptions[] = [
+    appOrFileMenu,
+    { role: "editMenu" },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+  ];
+
+  return Menu.buildFromTemplate(template);
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -57,6 +109,7 @@ ipcMain.handle(ipcChannels.openPullRequestUrl, async (_event, url: unknown) => {
 });
 
 void app.whenReady().then(() => {
+  Menu.setApplicationMenu(createApplicationMenu());
   createWindow();
 
   app.on("activate", () => {
