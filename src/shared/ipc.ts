@@ -1,4 +1,8 @@
 import type { DependencyReadiness } from "@/shared/dependencies";
+import type {
+  PiRunnerSessionSnapshot,
+  StartPiRepositoryVerificationInput,
+} from "@/shared/piRunner";
 import type { PullRequestDiscovery } from "@/shared/pullRequests";
 import type {
   LocalRepositoryInspection,
@@ -17,6 +21,9 @@ export const ipcChannels = {
   saveRepositoryMapping: "repository-mappings:save",
   openSettingsPage: "navigation:open-settings-page",
   openPullRequestUrl: "pull-requests:open-url",
+  abortPiRunnerSession: "pi-runner:abort-session",
+  listPiRunnerSessions: "pi-runner:list-sessions",
+  startPiRepositoryVerification: "pi-runner:start-repository-verification",
 } as const;
 
 export type PrRoseyApi = {
@@ -33,6 +40,13 @@ export type PrRoseyApi = {
     list: () => Promise<RepositoryMappingList>;
     remove: (repositoryNameWithOwner: string) => Promise<RepositoryMappingList>;
     save: (input: SaveRepositoryMappingInput) => Promise<RepositoryMapping>;
+  };
+  piRunner: {
+    abortSession: (sessionId: string) => Promise<PiRunnerSessionSnapshot>;
+    listSessions: () => Promise<PiRunnerSessionSnapshot[]>;
+    startRepositoryVerification: (
+      input: StartPiRepositoryVerificationInput,
+    ) => Promise<PiRunnerSessionSnapshot>;
   };
   navigation: {
     onOpenSettingsPage: (listener: () => void) => () => void;

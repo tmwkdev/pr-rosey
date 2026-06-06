@@ -13,6 +13,11 @@ import {
 } from "electron";
 import { checkDependencies } from "@/main/dependencyCheckService";
 import {
+  abortPiRunnerSession,
+  listPiRunnerSessions,
+  startPiRepositoryVerification,
+} from "@/main/piRunnerService";
+import {
   fetchAuthoredOpenPullRequests,
   fetchReviewRequestedOpenPullRequests,
 } from "@/main/pullRequestService";
@@ -23,6 +28,7 @@ import {
   saveRepositoryMapping,
 } from "@/main/repositoryMappingService";
 import { ipcChannels } from "@/shared/ipc";
+import type { PullRequestSummary } from "@/shared/pullRequests";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -177,6 +183,30 @@ ipcMain.handle(ipcChannels.openPullRequestUrl, async (_event, url: unknown) => {
   }
 
   await shell.openExternal(parsedUrl.toString());
+});
+ipcMain.handle(ipcChannels.listPiRunnerSessions, () => listPiRunnerSessions());
+ipcMain.handle(ipcChannels.startPiRepositoryVerification, (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Pi runner input is required.");
+  }
+
+  const pullRequest = (input as { pullRequest?: unknown }).pullRequest;
+
+  if (!pullRequest || typeof pullRequest !== "object") {
+    throw new Error("Pi runner input must include a pull request.");
+  }
+
+  return startPiRepositoryVerification(
+    repositoryMappingOptions(),
+    pullRequest as PullRequestSummary,
+  );
+});
+ipcMain.handle(ipcChannels.abortPiRunnerSession, (_event, sessionId: unknown) => {
+  if (typeof sessionId !== "string") {
+    throw new Error("Pi runner session id must be a string.");
+  }
+
+  return abortPiRunnerSession(repositoryMappingOptions(), sessionId);
 });
 
 void app.whenReady().then(() => {

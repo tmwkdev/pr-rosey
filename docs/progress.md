@@ -4,6 +4,31 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-06 Pi Repository Verification Receipt
+
+- Approved scope: chat-approved first Pi integration checkpoint for clicking a PR-row action,
+  spawning Pi in that PR repository, and showing visible evidence that the launch happened.
+- Changed: added typed Pi runner IPC, a main-process `pi --mode rpc --no-session` subprocess
+  boundary, trusted repository-mapping lookup and git-origin validation, read-only repository
+  verification prompt dispatch, in-memory session snapshots, JSONL log file writes, abort support,
+  a renderer polling hook, and a compact PR-row evidence panel with cwd, pid/session id, log path,
+  recent output, status, and stop action.
+- Files changed: `src/shared/piRunner.ts`, `src/shared/ipc.ts`, `src/main/piRunnerService.ts`,
+  `src/main/piRunnerService.test.ts`, `src/main/index.ts`, `src/preload/index.ts`,
+  `src/renderer/features/pi-runner/usePiRunnerSessions.ts`, `src/renderer/App.tsx`,
+  `src/renderer/features/pull-requests/PullRequestsPanel.tsx`, and this progress note.
+- Verification: targeted Pi runner tests passed; `npm run format && npm run check` passed;
+  `npm run dev` built main and preload, launched Electron/Vite at `http://localhost:5173/`, and
+  `curl -I /` returned HTTP 200 before shutdown.
+- Review: separate-agent review found no blocking findings. Follow-up review flagged a minor abort
+  lifecycle risk; fixed by keeping sessions in `aborting` state until the child process exits and by
+  disabling Pi starts while any session is active. Final reviewer confirmation found no blocking
+  findings.
+- Remaining risk: this is not the full managed-worktree babysitter spike yet; Pi must already be
+  installed/configured, mapped repositories are used directly instead of managed worktrees, and
+  in-app Browser visual verification could not run because the Browser plugin reported
+  `Browser is not available: iab`.
+
 ## 2026-06-05 Brand Asset Receipt
 
 - Approved scope: chat-approved brand asset setup using the selected pr-rosey mascot concept.
