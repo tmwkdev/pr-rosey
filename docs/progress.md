@@ -4,6 +4,23 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-05 Brand Asset Receipt
+
+- Approved scope: chat-approved brand asset setup using the selected pr-rosey mascot concept.
+- Changed: added reusable raster brand assets under `assets/brand/`, including concept-sheet crops
+  and transparent-background variants; added the selected logo lockup as the top README header; and
+  verified the existing Electron icon path points at the transparent app icon. Rebuilt the app icon
+  with ImageMagick flood-fill transparency and extra canvas padding so macOS command-tab/Dock
+  rendering has shadow space and no exterior white strip.
+- Files changed: `README.md`, `assets/brand/*.png`, and this progress note.
+- Verification: `npm run check` passed; `npm run dev` launched Electron/Vite on
+  `http://localhost:5174/` because 5173 was occupied, and `curl -I` returned HTTP 200 before
+  shutdown; `npm run build` passed and the built main bundle contains the app icon asset path.
+- Review: separate-agent review found no code-boundary issues. It flagged that `assets/brand/`
+  files are untracked until included in a commit and that native Dock/window icon display was not
+  visually inspected.
+- Remaining risk: assets are generated raster concept art, not final vector/logo production files.
+
 ## 2026-06-05 Repository Mapping Settings Receipt
 
 - Approved scope: chat-approved settings increment for maintaining a mapping between GitHub remote

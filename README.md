@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/brand/pr-rosey-logo-lockup.png" alt="pr-rosey" width="900" />
+</p>
+
 pr-rosey
 ========
 
