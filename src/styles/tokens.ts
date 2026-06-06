@@ -27,9 +27,11 @@ export const tokens = {
     value: "font-mono text-sm text-ink",
   },
   text: {
+    error: "text-sm text-rosey",
     meta: "text-xs text-muted",
     monoMeta: "font-mono text-xs text-ink",
     mutedBody: "text-sm leading-6 text-muted",
+    success: "text-sm text-moss",
   },
   input: {
     base: "min-h-9 rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink shadow-sm shadow-black/20 focus:border-moss focus:outline-none focus:ring-2 focus:ring-moss/25",
