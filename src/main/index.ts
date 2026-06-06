@@ -1,11 +1,14 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Menu,
   type MenuItemConstructorOptions,
+  type OpenDialogOptions,
   shell,
 } from "electron";
 import { checkDependencies } from "@/main/dependencyCheckService";
@@ -13,12 +16,23 @@ import {
   fetchAuthoredOpenPullRequests,
   fetchReviewRequestedOpenPullRequests,
 } from "@/main/pullRequestService";
+import {
+  inspectLocalRepository,
+  listRepositoryMappings,
+  removeRepositoryMapping,
+  saveRepositoryMapping,
+} from "@/main/repositoryMappingService";
 import { ipcChannels } from "@/shared/ipc";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const appRoot = path.resolve(__dirname, "../..");
 const preloadPath = path.join(__dirname, "../preload/index.cjs");
+const appIconPath = path.join(appRoot, "assets/brand/pr-rosey-app-icon-transparent.png");
+
+function getAppIconPath(): string | undefined {
+  return fs.existsSync(appIconPath) ? appIconPath : undefined;
+}
 
 function openSettingsPage(): void {
   const targetWindow = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
@@ -66,6 +80,7 @@ function createApplicationMenu(): Menu {
 }
 
 function createWindow(): void {
+  const icon = getAppIconPath();
   const mainWindow = new BrowserWindow({
     width: 1080,
     height: 760,
@@ -73,6 +88,7 @@ function createWindow(): void {
     minHeight: 560,
     title: "pr-rosey",
     backgroundColor: "#fbfaf7",
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -89,11 +105,66 @@ function createWindow(): void {
   void mainWindow.loadFile(path.join(appRoot, "out/renderer/index.html"));
 }
 
+function repositoryMappingOptions() {
+  return {
+    userDataPath: app.getPath("userData"),
+  };
+}
+
 ipcMain.handle(ipcChannels.checkDependencies, () => checkDependencies());
 ipcMain.handle(ipcChannels.fetchPullRequests, () => fetchAuthoredOpenPullRequests());
 ipcMain.handle(ipcChannels.fetchReviewRequestedPullRequests, () =>
   fetchReviewRequestedOpenPullRequests(),
 );
+ipcMain.handle(ipcChannels.listRepositoryMappings, () =>
+  listRepositoryMappings(repositoryMappingOptions()),
+);
+ipcMain.handle(ipcChannels.chooseLocalRepository, async (event) => {
+  const browserWindow = BrowserWindow.fromWebContents(event.sender);
+  const options: OpenDialogOptions = {
+    buttonLabel: "Use Repository",
+    message: "Choose a local clone to connect to a GitHub repository.",
+    properties: ["openDirectory"],
+  };
+  const result = browserWindow
+    ? await dialog.showOpenDialog(browserWindow, options)
+    : await dialog.showOpenDialog(options);
+
+  if (result.canceled || !result.filePaths[0]) {
+    return null;
+  }
+
+  return inspectLocalRepository(repositoryMappingOptions(), result.filePaths[0]);
+});
+ipcMain.handle(ipcChannels.saveRepositoryMapping, (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Repository mapping input is required.");
+  }
+
+  const mappingInput = input as {
+    repositoryNameWithOwner?: unknown;
+    localPath?: unknown;
+  };
+
+  if (
+    typeof mappingInput.repositoryNameWithOwner !== "string" ||
+    typeof mappingInput.localPath !== "string"
+  ) {
+    throw new Error("Repository mapping input must include owner/repo and local path.");
+  }
+
+  return saveRepositoryMapping(repositoryMappingOptions(), {
+    repositoryNameWithOwner: mappingInput.repositoryNameWithOwner,
+    localPath: mappingInput.localPath,
+  });
+});
+ipcMain.handle(ipcChannels.removeRepositoryMapping, (_event, repositoryNameWithOwner: unknown) => {
+  if (typeof repositoryNameWithOwner !== "string") {
+    throw new Error("Repository mapping key must be owner/repo.");
+  }
+
+  return removeRepositoryMapping(repositoryMappingOptions(), repositoryNameWithOwner);
+});
 ipcMain.handle(ipcChannels.openPullRequestUrl, async (_event, url: unknown) => {
   if (typeof url !== "string") {
     throw new Error("Pull request URL must be a string.");
@@ -109,6 +180,11 @@ ipcMain.handle(ipcChannels.openPullRequestUrl, async (_event, url: unknown) => {
 });
 
 void app.whenReady().then(() => {
+  const icon = getAppIconPath();
+  if (process.platform === "darwin" && icon) {
+    app.dock?.setIcon(icon);
+  }
+
   Menu.setApplicationMenu(createApplicationMenu());
   createWindow();
 

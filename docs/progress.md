@@ -4,6 +4,28 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-05 Repository Mapping Settings Receipt
+
+- Approved scope: chat-approved settings increment for maintaining a mapping between GitHub remote
+  repositories and trusted local clone paths, in support of the active managed-runner spike.
+- Changed: replaced the settings placeholder with a repository mapping workflow, added typed
+  repository-mapping IPC, added main-process local clone inspection and JSON persistence under
+  Electron user data, and added shared normalization helpers plus service tests.
+- Files changed: `src/shared/repositoryMappings.ts`, `src/shared/repositoryMappings.test.ts`,
+  `src/main/repositoryMappingService.ts`, `src/main/repositoryMappingService.test.ts`,
+  `src/main/index.ts`, `src/preload/index.ts`, `src/shared/ipc.ts`,
+  `src/renderer/features/settings/SettingsPage.tsx`, `src/styles/tokens.ts`, and this progress
+  note.
+- Verification: targeted repository-mapping tests passed; `npm run check` passed; `npm run build`
+  passed; `npm run dev` launched Electron/Vite on `http://localhost:5173/`, and `/` plus
+  `/#settings` returned HTTP 200 before shutdown.
+- Review: separate-agent review found a concurrent mutation race in repository-mapping persistence;
+  fixed with per-user-data-path mutation serialization, unique temp files, and a concurrent
+  save/remove regression test. Follow-up review found no remaining mapping-code findings.
+- Remaining risk: in-app Browser visual verification could not run because the Browser plugin
+  reported `Browser is not available: iab`; unrelated untracked binary asset directories
+  `assets/` and `docs/brand/` remain outside this work item.
+
 ## 2026-06-05 Settings Page Placeholder Receipt
 
 - Approved scope: chat-approved settings placeholder page that is distinct from the PR landing page

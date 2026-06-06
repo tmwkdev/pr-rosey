@@ -11,6 +11,13 @@ const api: PrRoseyApi = {
       ipcRenderer.invoke(ipcChannels.fetchReviewRequestedPullRequests),
     openUrl: (url) => ipcRenderer.invoke(ipcChannels.openPullRequestUrl, url),
   },
+  repositoryMappings: {
+    chooseLocalRepository: () => ipcRenderer.invoke(ipcChannels.chooseLocalRepository),
+    list: () => ipcRenderer.invoke(ipcChannels.listRepositoryMappings),
+    remove: (repositoryNameWithOwner) =>
+      ipcRenderer.invoke(ipcChannels.removeRepositoryMapping, repositoryNameWithOwner),
+    save: (input) => ipcRenderer.invoke(ipcChannels.saveRepositoryMapping, input),
+  },
   navigation: {
     onOpenSettingsPage: (listener) => {
       const handler = () => listener();
