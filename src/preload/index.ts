@@ -18,6 +18,12 @@ const api: PrRoseyApi = {
       ipcRenderer.invoke(ipcChannels.removeRepositoryMapping, repositoryNameWithOwner),
     save: (input) => ipcRenderer.invoke(ipcChannels.saveRepositoryMapping, input),
   },
+  piRunner: {
+    abortSession: (sessionId) => ipcRenderer.invoke(ipcChannels.abortPiRunnerSession, sessionId),
+    listSessions: () => ipcRenderer.invoke(ipcChannels.listPiRunnerSessions),
+    startRepositoryVerification: (input) =>
+      ipcRenderer.invoke(ipcChannels.startPiRepositoryVerification, input),
+  },
   navigation: {
     onOpenSettingsPage: (listener) => {
       const handler = () => listener();

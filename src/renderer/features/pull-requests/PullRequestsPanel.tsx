@@ -1,3 +1,4 @@
+import { type PiRunnerSessionSnapshot, piRunnerSessionKey } from "@/shared/piRunner";
 import {
   ciStatusLabels,
   formatCiStatusSummary,
@@ -16,6 +17,16 @@ type PullRequestSectionState = {
   openingUrl: string | null;
   openPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
   refresh: () => Promise<void>;
+};
+
+type PiRunnerPanelState = {
+  abortingSessionId: string | null;
+  error: string | null;
+  hasActiveSession: boolean;
+  sessions: PiRunnerSessionSnapshot[];
+  startingPullRequestUrl: string | null;
+  abortSession: (sessionId: string) => Promise<void>;
+  startRepositoryVerification: (pullRequest: PullRequestSummary) => Promise<void>;
 };
 
 type PullRequestSectionCopy = {
@@ -83,24 +94,26 @@ function formatPullRequestCount(
 
 interface PullRequestsPanelProps {
   authored: PullRequestSectionState;
+  piRunner: PiRunnerPanelState;
   reviewRequested: PullRequestSectionState;
 }
 
-export function PullRequestsPanel({ authored, reviewRequested }: PullRequestsPanelProps) {
+export function PullRequestsPanel({ authored, piRunner, reviewRequested }: PullRequestsPanelProps) {
   return (
     <section className="min-h-full bg-paper">
-      <PullRequestSection kind="authored" state={authored} />
-      <PullRequestSection kind="review-requested" state={reviewRequested} />
+      <PullRequestSection kind="authored" piRunner={piRunner} state={authored} />
+      <PullRequestSection kind="review-requested" piRunner={piRunner} state={reviewRequested} />
     </section>
   );
 }
 
 interface PullRequestSectionProps {
   kind: PullRequestSectionKind;
+  piRunner: PiRunnerPanelState;
   state: PullRequestSectionState;
 }
 
-function PullRequestSection({ kind, state }: PullRequestSectionProps) {
+function PullRequestSection({ kind, piRunner, state }: PullRequestSectionProps) {
   const copy = sectionCopy[kind];
   const hasError = Boolean(state.error);
   const pullRequests = state.discovery?.pullRequests ?? [];
@@ -121,12 +134,14 @@ function PullRequestSection({ kind, state }: PullRequestSectionProps) {
       </div>
 
       {hasError && state.error ? <PullRequestError message={state.error} /> : null}
+      {piRunner.error ? <PullRequestError message={piRunner.error} /> : null}
 
       <PullRequestList
         hasError={hasError}
         isInitialLoading={showInitialLoading}
         kind={kind}
         openingPullRequestUrl={state.openingUrl}
+        piRunner={piRunner}
         pullRequests={pullRequests}
         onOpenPullRequest={state.openPullRequest}
       />
@@ -151,6 +166,7 @@ interface PullRequestListProps {
   isInitialLoading: boolean;
   kind: PullRequestSectionKind;
   openingPullRequestUrl: string | null;
+  piRunner: PiRunnerPanelState;
   pullRequests: PullRequestSummary[];
   onOpenPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
 }
@@ -160,6 +176,7 @@ function PullRequestList({
   isInitialLoading,
   kind,
   openingPullRequestUrl,
+  piRunner,
   pullRequests,
   onOpenPullRequest,
 }: PullRequestListProps) {
@@ -178,6 +195,7 @@ function PullRequestList({
               isOpening={openingPullRequestUrl === pullRequest.url}
               key={pullRequest.url}
               kind={kind}
+              piRunner={piRunner}
               pullRequest={pullRequest}
               onOpenPullRequest={onOpenPullRequest}
             />
@@ -235,11 +253,22 @@ function EmptyPullRequests({ kind }: EmptyPullRequestsProps) {
 interface PullRequestRowProps {
   isOpening: boolean;
   kind: PullRequestSectionKind;
+  piRunner: PiRunnerPanelState;
   pullRequest: PullRequestSummary;
   onOpenPullRequest: (pullRequest: PullRequestSummary) => Promise<void>;
 }
 
-function PullRequestRow({ isOpening, kind, pullRequest, onOpenPullRequest }: PullRequestRowProps) {
+function PullRequestRow({
+  isOpening,
+  kind,
+  piRunner,
+  pullRequest,
+  onOpenPullRequest,
+}: PullRequestRowProps) {
+  const piSession = findLatestPiSession(piRunner.sessions, pullRequest);
+  const isStartingPi = piRunner.startingPullRequestUrl === pullRequest.url;
+  const isPiActionDisabled = isStartingPi || piRunner.hasActiveSession;
+
   return (
     <div className="group grid grid-cols-[minmax(0,1fr)] gap-3 px-5 py-4 text-sm transition hover:bg-panel/70 focus-within:bg-panel/70 sm:grid-cols-[minmax(0,1fr)_auto]">
       <div className="min-w-0">
@@ -266,12 +295,29 @@ function PullRequestRow({ isOpening, kind, pullRequest, onOpenPullRequest }: Pul
                 {pullRequest.headRefName}
               </span>
             </div>
+            {piSession ? (
+              <PiRunnerSessionEvidence
+                abortingSessionId={piRunner.abortingSessionId}
+                session={piSession}
+                onAbortSession={piRunner.abortSession}
+              />
+            ) : null}
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-3 sm:justify-end">
         <PullRequestCiStatusIndicator status={pullRequest.ciStatus} />
+        <button
+          className={`${tokens.button.quiet} sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100`}
+          disabled={isPiActionDisabled}
+          type="button"
+          onClick={() => {
+            void piRunner.startRepositoryVerification(pullRequest);
+          }}
+        >
+          {isStartingPi ? "Starting Pi" : "Verify with Pi"}
+        </button>
         <button
           className={`${tokens.button.quiet} sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100`}
           disabled={isOpening}
@@ -285,6 +331,114 @@ function PullRequestRow({ isOpening, kind, pullRequest, onOpenPullRequest }: Pul
       </div>
     </div>
   );
+}
+
+interface PiRunnerSessionEvidenceProps {
+  abortingSessionId: string | null;
+  session: PiRunnerSessionSnapshot;
+  onAbortSession: (sessionId: string) => Promise<void>;
+}
+
+function PiRunnerSessionEvidence({
+  abortingSessionId,
+  session,
+  onAbortSession,
+}: PiRunnerSessionEvidenceProps) {
+  const canAbort = session.status === "starting" || session.status === "running";
+  const visibleOutputLines = session.outputLines.slice(-4);
+
+  return (
+    <div className="mt-3 rounded-md border border-line bg-panel/80 p-3 text-xs">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className={tokens.status.item}>
+            <span
+              aria-hidden="true"
+              className={`${tokens.status.dot} ${getPiRunnerStatusDotClassName(session.status)}`}
+            />
+            <span className={tokens.status.label}>{getPiRunnerStatusLabel(session.status)}</span>
+            <span className={tokens.status.value}>
+              {session.pid ? `pid ${session.pid}` : session.id}
+            </span>
+          </div>
+          <p className="mt-1 truncate text-muted">{session.localPath}</p>
+          <p className="mt-1 truncate text-muted">Log: {session.logFilePath}</p>
+        </div>
+        {canAbort ? (
+          <button
+            className={tokens.button.quiet}
+            disabled={abortingSessionId === session.id}
+            type="button"
+            onClick={() => {
+              void onAbortSession(session.id);
+            }}
+          >
+            {abortingSessionId === session.id ? "Stopping" : "Stop Pi"}
+          </button>
+        ) : null}
+      </div>
+
+      {session.error ? <p className="mt-2 text-rosey">{session.error}</p> : null}
+
+      {visibleOutputLines.length > 0 ? (
+        <div className="mt-2 space-y-1">
+          {visibleOutputLines.map((line) => (
+            <p
+              className="truncate font-mono text-[11px] text-muted"
+              key={`${line.timestamp}-${line.message}`}
+            >
+              [{line.stream}] {line.message}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function findLatestPiSession(
+  sessions: PiRunnerSessionSnapshot[],
+  pullRequest: PullRequestSummary,
+): PiRunnerSessionSnapshot | null {
+  const sessionKey = piRunnerSessionKey(pullRequest);
+
+  return (
+    sessions.find(
+      (session) => `${session.repositoryNameWithOwner}#${session.pullRequestNumber}` === sessionKey,
+    ) ?? null
+  );
+}
+
+function getPiRunnerStatusLabel(status: PiRunnerSessionSnapshot["status"]): string {
+  switch (status) {
+    case "starting":
+      return "Pi starting";
+    case "running":
+      return "Pi running";
+    case "aborting":
+      return "Pi stopping";
+    case "exited":
+      return "Pi exited";
+    case "failed":
+      return "Pi failed";
+    case "aborted":
+      return "Pi stopped";
+  }
+}
+
+function getPiRunnerStatusDotClassName(status: PiRunnerSessionSnapshot["status"]): string {
+  switch (status) {
+    case "starting":
+    case "running":
+    case "aborting":
+      return tokens.statusDot.loading;
+    case "exited":
+      return tokens.statusDot.ready;
+    case "failed":
+      return tokens.statusDot.missing;
+    case "aborted":
+      return tokens.statusDot.unknown;
+  }
 }
 
 interface PullRequestStateMarkProps {

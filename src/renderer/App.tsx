@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePiRunnerSessions } from "@/renderer/features/pi-runner/usePiRunnerSessions";
 import PullRequestsPanel from "@/renderer/features/pull-requests/PullRequestsPanel";
 import {
   useAuthoredPullRequests,
@@ -84,6 +85,7 @@ export function App() {
   const readiness = useDependencyReadiness();
   const authoredPullRequests = useAuthoredPullRequests();
   const reviewRequestedPullRequests = useReviewRequestedPullRequests();
+  const piRunner = usePiRunnerSessions();
   const isRefreshingPullRequests =
     authoredPullRequests.isRefreshing || reviewRequestedPullRequests.isRefreshing;
 
@@ -139,6 +141,7 @@ export function App() {
             <main className="min-h-0 flex-1 overflow-auto">
               <PullRequestsPanel
                 authored={authoredPullRequests}
+                piRunner={piRunner}
                 reviewRequested={reviewRequestedPullRequests}
               />
             </main>
