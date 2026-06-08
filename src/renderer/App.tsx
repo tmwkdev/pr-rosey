@@ -138,7 +138,7 @@ export function App() {
               isChecking={readiness.isChecking}
             />
 
-            <main className="min-h-0 flex-1 overflow-auto">
+            <main className="min-h-0 flex-1 overflow-hidden">
               <PullRequestsPanel
                 authored={authoredPullRequests}
                 piRunner={piRunner}

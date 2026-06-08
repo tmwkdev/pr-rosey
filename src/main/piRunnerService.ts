@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -7,58 +6,76 @@ import {
   listRepositoryMappings,
   type RepositoryMappingServiceOptions,
 } from "@/main/repositoryMappingService";
-import type {
-  PiRunnerLogLine,
-  PiRunnerLogStream,
-  PiRunnerSessionSnapshot,
+import {
+  createPiRunnerActivityEvent,
+  type PiRunnerActivityEvent,
+  type PiRunnerConversationMessage,
+  type PiRunnerConversationStatus,
+  type PiRunnerLogLine,
+  type PiRunnerLogStream,
+  type PiRunnerSessionSnapshot,
+  summarizePiRunnerLogLine,
 } from "@/shared/piRunner";
 import type { PullRequestSummary } from "@/shared/pullRequests";
 import { type RepositoryMapping, repositoryMappingKey } from "@/shared/repositoryMappings";
 
-type PiRunnerProcess = {
-  pid?: number;
-  stderr: {
-    on(event: "data", listener: (chunk: Buffer | string) => void): unknown;
-  };
-  stdin: {
-    write(chunk: string): unknown;
-  };
-  stdout: {
-    on(event: "data", listener: (chunk: Buffer | string) => void): unknown;
-  };
-  kill(signal?: NodeJS.Signals): boolean;
-  on(event: "close", listener: (exitCode: number | null) => void): unknown;
-  on(event: "error", listener: (error: Error) => void): unknown;
+type PiAgentMessage = {
+  content?: unknown;
+  errorMessage?: unknown;
+  isError?: unknown;
+  role?: unknown;
+  stopReason?: unknown;
+  timestamp?: unknown;
+  toolName?: unknown;
 };
 
-type SpawnPiProcess = (
-  command: string,
-  args: string[],
-  options: { cwd: string },
-) => PiRunnerProcess;
+type PiAgentSessionEvent = {
+  args?: unknown;
+  errorMessage?: unknown;
+  isError?: boolean;
+  message?: unknown;
+  messages?: unknown[];
+  partialResult?: unknown;
+  result?: unknown;
+  toolName?: string;
+  type: string;
+  willRetry?: boolean;
+};
+
+type PiAgentSession = {
+  messages: readonly unknown[];
+  sessionFile: string | undefined;
+  sessionId: string;
+  abort: () => Promise<void>;
+  dispose: () => void;
+  prompt: (text: string) => Promise<void>;
+  subscribe: (listener: (event: PiAgentSessionEvent) => void) => () => void;
+};
+
+type CreatePiAgentSession = (input: {
+  cwd: string;
+  sessionDir: string;
+  tools: readonly string[];
+}) => Promise<PiAgentSession>;
+
+type PiRunnerRuntime = {
+  agentSession: PiAgentSession;
+  unsubscribe: () => void;
+};
 
 export type PiRunnerServiceOptions = RepositoryMappingServiceOptions & {
   createId?: () => string;
-  spawnProcess?: SpawnPiProcess;
+  createAgentSession?: CreatePiAgentSession;
 };
 
 const sessions = new Map<string, PiRunnerSessionSnapshot>();
-const processes = new Map<string, PiRunnerProcess>();
+const runtimes = new Map<string, PiRunnerRuntime>();
+const maxVisibleActivityEvents = 80;
 const maxVisibleOutputLines = 40;
+const readOnlyPiToolNames = ["read", "grep", "find", "ls"] as const;
 
 function nowIso(options: PiRunnerServiceOptions): string {
   return options.now?.() ?? new Date().toISOString();
-}
-
-function getSpawnProcess(options: PiRunnerServiceOptions): SpawnPiProcess {
-  return (
-    options.spawnProcess ??
-    ((command, args, spawnOptions) =>
-      spawn(command, args, {
-        cwd: spawnOptions.cwd,
-        stdio: "pipe",
-      }))
-  );
 }
 
 function getSessionId(options: PiRunnerServiceOptions): string {
@@ -67,6 +84,10 @@ function getSessionId(options: PiRunnerServiceOptions): string {
 
 function getLogFilePath(userDataPath: string, sessionId: string): string {
   return path.join(userDataPath, "pi-runner-logs", `${sessionId}.jsonl`);
+}
+
+function getPiSessionDir(userDataPath: string, sessionId: string): string {
+  return path.join(userDataPath, "pi-agent-sessions", sessionId);
 }
 
 function isActiveSession(session: PiRunnerSessionSnapshot): boolean {
@@ -78,6 +99,8 @@ function isActiveSession(session: PiRunnerSessionSnapshot): boolean {
 function snapshotSession(session: PiRunnerSessionSnapshot): PiRunnerSessionSnapshot {
   return {
     ...session,
+    activityEvents: [...session.activityEvents],
+    conversation: [...session.conversation],
     outputLines: [...session.outputLines],
   };
 }
@@ -88,11 +111,33 @@ async function recordSessionLine(
   message: string,
   timestamp: string,
 ): Promise<void> {
-  const line: PiRunnerLogLine = { timestamp, stream, message };
+  const rawLine: PiRunnerLogLine = { timestamp, stream, message };
+  const line = summarizePiRunnerLogLine(rawLine);
+
+  session.activityEvents = [...session.activityEvents, createPiRunnerActivityEvent(rawLine)].slice(
+    -maxVisibleActivityEvents,
+  );
   session.outputLines = [...session.outputLines, line].slice(-maxVisibleOutputLines);
   session.updatedAt = timestamp;
 
   await appendFile(session.logFilePath, `${JSON.stringify(line)}\n`, "utf8");
+}
+
+async function recordSessionActivity(
+  session: PiRunnerSessionSnapshot,
+  event: PiRunnerActivityEvent,
+): Promise<void> {
+  session.activityEvents = [...session.activityEvents, event].slice(-maxVisibleActivityEvents);
+  session.updatedAt = event.timestamp;
+
+  const line: PiRunnerLogLine = {
+    timestamp: event.timestamp,
+    stream: event.stream,
+    message: event.summary,
+  };
+  session.outputLines = [...session.outputLines, line].slice(-maxVisibleOutputLines);
+
+  await appendFile(session.logFilePath, `${JSON.stringify({ activity: event })}\n`, "utf8");
 }
 
 function recordSessionLineAsync(
@@ -102,66 +147,6 @@ function recordSessionLineAsync(
   message: string,
 ): void {
   void recordSessionLine(session, stream, message, nowIso(options)).catch(() => undefined);
-}
-
-function createLineCollector(onLine: (line: string) => void) {
-  let buffer = "";
-
-  return {
-    push(chunk: Buffer | string) {
-      buffer += chunk.toString();
-
-      let lineBreakIndex = buffer.indexOf("\n");
-
-      while (lineBreakIndex !== -1) {
-        const line = buffer.slice(0, lineBreakIndex).replace(/\r$/, "");
-        buffer = buffer.slice(lineBreakIndex + 1);
-
-        if (line.trim()) {
-          onLine(line);
-        }
-
-        lineBreakIndex = buffer.indexOf("\n");
-      }
-    },
-    flush() {
-      const line = buffer.replace(/\r$/, "");
-      buffer = "";
-
-      if (line.trim()) {
-        onLine(line);
-      }
-    },
-  };
-}
-
-function truncate(value: string): string {
-  return value.length > 400 ? `${value.slice(0, 397)}...` : value;
-}
-
-function summarizePiStdoutLine(line: string): string {
-  try {
-    const parsed = JSON.parse(line) as {
-      command?: unknown;
-      error?: unknown;
-      success?: unknown;
-      type?: unknown;
-    };
-
-    if (parsed.type === "response" && typeof parsed.command === "string") {
-      return `Pi response for ${parsed.command}: ${
-        parsed.success === true ? "accepted" : "failed"
-      }${typeof parsed.error === "string" ? ` (${parsed.error})` : ""}`;
-    }
-
-    if (typeof parsed.type === "string") {
-      return `Pi ${parsed.type}: ${truncate(line)}`;
-    }
-  } catch {
-    return truncate(line);
-  }
-
-  return truncate(line);
 }
 
 function findMappingForPullRequest(
@@ -178,6 +163,269 @@ function findMappingForPullRequest(
   );
 }
 
+async function createDefaultPiAgentSession({
+  cwd,
+  sessionDir,
+  tools,
+}: {
+  cwd: string;
+  sessionDir: string;
+  tools: readonly string[];
+}): Promise<PiAgentSession> {
+  const { createAgentSession, SessionManager } = await import("@earendil-works/pi-coding-agent");
+  const { session } = await createAgentSession({
+    cwd,
+    sessionManager: SessionManager.create(cwd, sessionDir),
+    tools: [...tools],
+  });
+
+  return session;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getTextFromContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  const lines: string[] = [];
+
+  for (const item of content) {
+    const record = asRecord(item);
+
+    if (!record || typeof record.type !== "string") {
+      continue;
+    }
+
+    if (record.type === "text" && typeof record.text === "string") {
+      lines.push(record.text);
+    }
+  }
+
+  return lines.join("\n").trim();
+}
+
+function getConversationStatus(
+  message: PiAgentMessage,
+  isStreaming: boolean,
+): PiRunnerConversationStatus {
+  if (isStreaming) {
+    return "streaming";
+  }
+
+  if (message.stopReason === "aborted") {
+    return "aborted";
+  }
+
+  if (message.stopReason === "error" || message.isError === true || message.errorMessage) {
+    return "failed";
+  }
+
+  return "complete";
+}
+
+function mapAgentMessageToConversationMessage(
+  message: unknown,
+  index: number,
+  isStreaming = false,
+): PiRunnerConversationMessage | null {
+  const record = asRecord(message) as PiAgentMessage | null;
+
+  if (!record || typeof record.role !== "string") {
+    return null;
+  }
+
+  const timestamp =
+    typeof record.timestamp === "number"
+      ? new Date(record.timestamp).toISOString()
+      : new Date(0).toISOString();
+  const body = getTextFromContent(record.content);
+  const fallbackBody = typeof record.errorMessage === "string" ? record.errorMessage : "";
+  const status = getConversationStatus(record, isStreaming);
+
+  if (record.role === "user") {
+    return {
+      id: `message-${index}-${timestamp}`,
+      role: "user",
+      status,
+      title: "Prompt",
+      body: body || fallbackBody,
+      timestamp,
+    };
+  }
+
+  if (record.role === "assistant") {
+    if (!body && !fallbackBody) {
+      return null;
+    }
+
+    return {
+      id: `message-${index}-${timestamp}`,
+      role: "assistant",
+      status,
+      title: isStreaming ? "Pi is responding" : "Pi response",
+      body: body || fallbackBody,
+      timestamp,
+    };
+  }
+
+  if (record.role === "toolResult") {
+    return null;
+  }
+
+  return null;
+}
+
+function getConversationFromAgentMessages(
+  messages: readonly unknown[],
+  streamingMessage?: unknown,
+): PiRunnerConversationMessage[] {
+  const agentMessages = [...messages];
+
+  if (streamingMessage) {
+    const lastMessage = asRecord(agentMessages.at(-1));
+    const streamingRecord = asRecord(streamingMessage);
+
+    if (
+      lastMessage &&
+      streamingRecord &&
+      lastMessage.role === streamingRecord.role &&
+      lastMessage.timestamp === streamingRecord.timestamp
+    ) {
+      agentMessages[agentMessages.length - 1] = streamingMessage;
+    } else {
+      agentMessages.push(streamingMessage);
+    }
+  }
+
+  return agentMessages
+    .map((message, index) =>
+      mapAgentMessageToConversationMessage(message, index, message === streamingMessage),
+    )
+    .filter((message): message is PiRunnerConversationMessage => Boolean(message));
+}
+
+function summarizeValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  const record = asRecord(value);
+
+  if (record) {
+    const content = getTextFromContent(record.content);
+    if (content) {
+      return content;
+    }
+  }
+
+  return "";
+}
+
+function formatToolArgs(args: unknown): string | null {
+  const record = asRecord(args);
+
+  if (!record) {
+    return null;
+  }
+
+  if (typeof record.command === "string") {
+    return record.command;
+  }
+
+  return Object.entries(record)
+    .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
+    .join("\n");
+}
+
+function createActivityEventFromAgentEvent(
+  event: PiAgentSessionEvent,
+  timestamp: string,
+): PiRunnerActivityEvent | null {
+  switch (event.type) {
+    case "agent_start":
+      return {
+        timestamp,
+        kind: "system",
+        status: "info",
+        title: "Pi started",
+        summary: "Pi AgentSession started.",
+        detail: null,
+        stream: "system",
+      };
+    case "turn_start":
+      return {
+        timestamp,
+        kind: "system",
+        status: "info",
+        title: "Turn started",
+        summary: "Pi started a new agent turn.",
+        detail: null,
+        stream: "system",
+      };
+    case "tool_execution_start":
+      return {
+        timestamp,
+        kind: "tool-activity",
+        status: "pending",
+        title: event.toolName ? `Tool started: ${event.toolName}` : "Tool started",
+        summary: event.toolName ? `Running ${event.toolName}.` : "Running tool.",
+        detail: formatToolArgs(event.args),
+        stream: "system",
+      };
+    case "tool_execution_update": {
+      return {
+        timestamp,
+        kind: "tool-activity",
+        status: "pending",
+        title: event.toolName ? `Tool update: ${event.toolName}` : "Tool update",
+        summary: event.toolName
+          ? `${event.toolName} reported progress.`
+          : "Tool reported progress.",
+        detail: formatToolArgs(event.args),
+        stream: "system",
+      };
+    }
+    case "tool_execution_end": {
+      const errorSummary = event.isError ? summarizeValue(event.result) : "";
+      return {
+        timestamp,
+        kind: event.isError ? "error" : "tool-activity",
+        status: event.isError ? "failed" : "success",
+        title: event.toolName
+          ? `Tool ${event.isError ? "failed" : "finished"}: ${event.toolName}`
+          : `Tool ${event.isError ? "failed" : "finished"}`,
+        summary:
+          errorSummary ||
+          (event.toolName ? `${event.toolName} finished.` : "Tool execution finished."),
+        detail: formatToolArgs(event.args),
+        stream: event.isError ? "stderr" : "system",
+      };
+    }
+    case "agent_end":
+      return {
+        timestamp,
+        kind: "system",
+        status: "success",
+        title: "Pi finished",
+        summary: event.willRetry ? "Pi finished this attempt and will retry." : "Pi finished.",
+        detail: null,
+        stream: "system",
+      };
+    default:
+      return null;
+  }
+}
+
 export function createPiRepositoryVerificationPrompt(
   pullRequest: PullRequestSummary,
   localPath: string,
@@ -187,10 +435,10 @@ export function createPiRepositoryVerificationPrompt(
     `Expected repository: ${pullRequest.repository.nameWithOwner}`,
     `Pull request: ${pullRequest.url}`,
     `Working directory: ${localPath}`,
-    "Verify that your current working directory is inside this repository.",
-    "Use only read-only commands such as pwd, git rev-parse --show-toplevel, and git remote get-url origin.",
+    "Inspect the available project files with read-only tools and summarize whether the workspace looks like the expected repository.",
+    "Only read, list, find, or grep files. Do not run shell commands.",
     "Do not edit files, commit, push, merge, comment on GitHub, rerun CI, or start follow-up work.",
-    "Reply with VERIFIED plus the repository root and origin remote if they match; otherwise explain the mismatch.",
+    "Reply with VERIFIED plus the evidence you inspected if the workspace appears correct; otherwise explain the mismatch.",
   ].join("\n");
 }
 
@@ -201,11 +449,12 @@ export function listPiRunnerSessions(): PiRunnerSessionSnapshot[] {
 }
 
 export function resetPiRunnerSessionsForTests(): void {
-  for (const childProcess of processes.values()) {
-    childProcess.kill("SIGTERM");
+  for (const runtime of runtimes.values()) {
+    runtime.unsubscribe();
+    runtime.agentSession.dispose();
   }
 
-  processes.clear();
+  runtimes.clear();
   sessions.clear();
 }
 
@@ -263,6 +512,8 @@ export async function startPiRepositoryVerification(
     exitCode: null,
     error: null,
     logFilePath,
+    activityEvents: [],
+    conversation: [],
     outputLines: [],
   };
 
@@ -270,75 +521,122 @@ export async function startPiRepositoryVerification(
   await recordSessionLine(
     session,
     "system",
-    `Starting pi --mode rpc --no-session in ${inspection.localPath}.`,
+    `Starting Pi AgentSession in ${inspection.localPath}.`,
     startedAt,
   );
 
-  const childProcess = getSpawnProcess(options)(
-    "pi",
-    [
-      "--mode",
-      "rpc",
-      "--no-session",
-      "--name",
-      `pr-rosey ${pullRequest.repository.nameWithOwner}#${pullRequest.number}`,
-    ],
-    { cwd: inspection.localPath },
-  );
-  const stdoutCollector = createLineCollector((line) => {
-    recordSessionLineAsync(options, session, "stdout", summarizePiStdoutLine(line));
-  });
-  const stderrCollector = createLineCollector((line) => {
-    recordSessionLineAsync(options, session, "stderr", truncate(line));
-  });
+  let agentSession: PiAgentSession;
 
-  processes.set(session.id, childProcess);
-  session.pid = childProcess.pid ?? null;
-  session.status = "running";
-
-  childProcess.stdout.on("data", (chunk) => {
-    stdoutCollector.push(chunk);
-  });
-  childProcess.stderr.on("data", (chunk) => {
-    stderrCollector.push(chunk);
-  });
-  childProcess.on("error", (error) => {
+  try {
+    agentSession = await (options.createAgentSession ?? createDefaultPiAgentSession)({
+      cwd: inspection.localPath,
+      sessionDir: getPiSessionDir(options.userDataPath, session.id),
+      tools: readOnlyPiToolNames,
+    });
+  } catch (error) {
+    const failedAt = nowIso(options);
     session.status = "failed";
-    session.error = error.message;
-    session.exitedAt = nowIso(options);
-    processes.delete(session.id);
-    recordSessionLineAsync(options, session, "system", `Pi process failed: ${error.message}`);
-  });
-  childProcess.on("close", (exitCode) => {
-    stdoutCollector.flush();
-    stderrCollector.flush();
+    session.error = error instanceof Error ? error.message : "Could not create Pi AgentSession.";
+    session.exitedAt = failedAt;
+    session.exitCode = 1;
+    session.updatedAt = failedAt;
+    await recordSessionLine(
+      session,
+      "system",
+      `Pi AgentSession failed before prompt: ${session.error}`,
+      failedAt,
+    );
 
-    if (session.status === "aborting") {
-      session.status = "aborted";
-    } else if (session.status !== "failed") {
-      session.status = "exited";
+    throw error;
+  }
+
+  session.pid = null;
+  session.status = "running";
+  session.conversation = getConversationFromAgentMessages(agentSession.messages);
+  await recordSessionLine(
+    session,
+    "system",
+    `Created Pi AgentSession ${agentSession.sessionId}${
+      agentSession.sessionFile ? ` at ${agentSession.sessionFile}` : ""
+    }.`,
+    nowIso(options),
+  );
+
+  const unsubscribe = agentSession.subscribe((event) => {
+    const timestamp = nowIso(options);
+    session.updatedAt = timestamp;
+
+    if (event.type === "message_update" && event.message) {
+      session.conversation = getConversationFromAgentMessages(agentSession.messages, event.message);
+      return;
     }
 
-    session.exitCode = exitCode;
-    session.exitedAt = nowIso(options);
-    session.updatedAt = session.exitedAt;
-    processes.delete(session.id);
-    recordSessionLineAsync(options, session, "system", `Pi process exited with code ${exitCode}.`);
+    if (event.type === "message_end" || event.type === "turn_end" || event.type === "agent_end") {
+      const messages =
+        event.type === "agent_end" && Array.isArray(event.messages)
+          ? event.messages
+          : agentSession.messages;
+      session.conversation = getConversationFromAgentMessages(messages);
+    }
+
+    const activityEvent = createActivityEventFromAgentEvent(event, timestamp);
+    if (activityEvent) {
+      void recordSessionActivity(session, activityEvent).catch(() => undefined);
+    }
+
+    if (event.type === "agent_end") {
+      if (event.willRetry) {
+        return;
+      }
+
+      session.status = session.status === "aborting" ? "aborted" : "exited";
+      session.exitCode = 0;
+      session.exitedAt = timestamp;
+      runtimes.delete(session.id);
+      unsubscribe();
+      agentSession.dispose();
+    }
   });
 
-  const promptCommand = {
-    id: `${session.id}-verify`,
-    type: "prompt",
-    message: createPiRepositoryVerificationPrompt(pullRequest, inspection.localPath),
-  };
+  runtimes.set(session.id, { agentSession, unsubscribe });
 
-  childProcess.stdin.write(`${JSON.stringify(promptCommand)}\n`);
   await recordSessionLine(
     session,
     "system",
     `Sent read-only repository verification prompt for ${pullRequest.repository.nameWithOwner}#${pullRequest.number}.`,
     nowIso(options),
   );
+  session.conversation = [
+    ...session.conversation,
+    {
+      id: `${session.id}-prompt`,
+      role: "user",
+      status: "pending",
+      title: "Prompt",
+      body: createPiRepositoryVerificationPrompt(pullRequest, inspection.localPath),
+      timestamp: session.updatedAt,
+    },
+  ];
+
+  void agentSession
+    .prompt(createPiRepositoryVerificationPrompt(pullRequest, inspection.localPath))
+    .catch((error: unknown) => {
+      const timestamp = nowIso(options);
+      session.status = session.status === "aborting" ? "aborted" : "failed";
+      session.error = error instanceof Error ? error.message : "Pi AgentSession failed.";
+      session.exitedAt = timestamp;
+      session.exitCode = session.status === "aborted" ? 0 : 1;
+      session.updatedAt = timestamp;
+      runtimes.delete(session.id);
+      unsubscribe();
+      agentSession.dispose();
+      recordSessionLineAsync(
+        options,
+        session,
+        "system",
+        `Pi AgentSession failed: ${session.error}`,
+      );
+    });
 
   return snapshotSession(session);
 }
@@ -353,16 +651,16 @@ export async function abortPiRunnerSession(
     throw new Error("Pi runner session was not found.");
   }
 
-  const childProcess = processes.get(sessionId);
+  const runtime = runtimes.get(sessionId);
 
-  if (!childProcess || !isActiveSession(session)) {
+  if (!runtime || !isActiveSession(session)) {
     return snapshotSession(session);
   }
 
   session.status = "aborting";
   session.updatedAt = nowIso(options);
   await recordSessionLine(session, "system", "Abort requested by user.", session.updatedAt);
-  childProcess.kill("SIGTERM");
+  await runtime.agentSession.abort();
 
   return snapshotSession(session);
 }

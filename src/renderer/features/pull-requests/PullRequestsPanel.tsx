@@ -1,3 +1,4 @@
+import PiSessionConsole from "@/renderer/features/pi-runner/PiSessionConsole";
 import { type PiRunnerSessionSnapshot, piRunnerSessionKey } from "@/shared/piRunner";
 import {
   ciStatusLabels,
@@ -23,9 +24,12 @@ type PiRunnerPanelState = {
   abortingSessionId: string | null;
   error: string | null;
   hasActiveSession: boolean;
+  selectedSession: PiRunnerSessionSnapshot | null;
+  selectedSessionId: string | null;
   sessions: PiRunnerSessionSnapshot[];
   startingPullRequestUrl: string | null;
   abortSession: (sessionId: string) => Promise<void>;
+  selectSession: (sessionId: string | null) => void;
   startRepositoryVerification: (pullRequest: PullRequestSummary) => Promise<void>;
 };
 
@@ -100,9 +104,18 @@ interface PullRequestsPanelProps {
 
 export function PullRequestsPanel({ authored, piRunner, reviewRequested }: PullRequestsPanelProps) {
   return (
-    <section className="min-h-full bg-paper">
-      <PullRequestSection kind="authored" piRunner={piRunner} state={authored} />
-      <PullRequestSection kind="review-requested" piRunner={piRunner} state={reviewRequested} />
+    <section className="grid h-full min-h-0 bg-paper lg:grid-cols-[minmax(360px,0.42fr)_minmax(520px,0.58fr)]">
+      <div className="min-h-0 overflow-auto border-r border-line">
+        <PullRequestSection kind="authored" piRunner={piRunner} state={authored} />
+        <PullRequestSection kind="review-requested" piRunner={piRunner} state={reviewRequested} />
+      </div>
+      <div className="min-h-0 overflow-hidden border-t border-line lg:border-t-0">
+        <PiSessionConsole
+          abortingSessionId={piRunner.abortingSessionId}
+          session={piRunner.selectedSession}
+          onAbortSession={piRunner.abortSession}
+        />
+      </div>
     </section>
   );
 }
@@ -268,9 +281,14 @@ function PullRequestRow({
   const piSession = findLatestPiSession(piRunner.sessions, pullRequest);
   const isStartingPi = piRunner.startingPullRequestUrl === pullRequest.url;
   const isPiActionDisabled = isStartingPi || piRunner.hasActiveSession;
+  const isSelectedPiSession = Boolean(piSession && piRunner.selectedSessionId === piSession.id);
 
   return (
-    <div className="group grid grid-cols-[minmax(0,1fr)] gap-3 px-5 py-4 text-sm transition hover:bg-panel/70 focus-within:bg-panel/70 sm:grid-cols-[minmax(0,1fr)_auto]">
+    <div
+      className={`group grid grid-cols-[minmax(0,1fr)] gap-3 px-5 py-4 text-sm transition hover:bg-panel/70 focus-within:bg-panel/70 sm:grid-cols-[minmax(0,1fr)_auto] ${
+        isSelectedPiSession ? "bg-moss/[0.055] shadow-[3px_0_0_#6bd19b_inset]" : ""
+      }`}
+    >
       <div className="min-w-0">
         <div className="flex min-w-0 items-start gap-3">
           <PullRequestStateMark isDraft={pullRequest.isDraft} />
@@ -298,8 +316,10 @@ function PullRequestRow({
             {piSession ? (
               <PiRunnerSessionEvidence
                 abortingSessionId={piRunner.abortingSessionId}
+                isSelected={isSelectedPiSession}
                 session={piSession}
                 onAbortSession={piRunner.abortSession}
+                onSelectSession={piRunner.selectSession}
               />
             ) : null}
           </div>
@@ -335,17 +355,22 @@ function PullRequestRow({
 
 interface PiRunnerSessionEvidenceProps {
   abortingSessionId: string | null;
+  isSelected: boolean;
   session: PiRunnerSessionSnapshot;
   onAbortSession: (sessionId: string) => Promise<void>;
+  onSelectSession: (sessionId: string | null) => void;
 }
 
 function PiRunnerSessionEvidence({
   abortingSessionId,
+  isSelected,
   session,
   onAbortSession,
+  onSelectSession,
 }: PiRunnerSessionEvidenceProps) {
-  const canAbort = session.status === "starting" || session.status === "running";
-  const visibleOutputLines = session.outputLines.slice(-4);
+  const showStopAction =
+    session.status === "starting" || session.status === "running" || session.status === "aborting";
+  const lastActivity = session.activityEvents.at(-1);
 
   return (
     <div className="mt-3 rounded-md border border-line bg-panel/80 p-3 text-xs">
@@ -364,34 +389,42 @@ function PiRunnerSessionEvidence({
           <p className="mt-1 truncate text-muted">{session.localPath}</p>
           <p className="mt-1 truncate text-muted">Log: {session.logFilePath}</p>
         </div>
-        {canAbort ? (
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <button
             className={tokens.button.quiet}
-            disabled={abortingSessionId === session.id}
+            disabled={isSelected}
             type="button"
             onClick={() => {
-              void onAbortSession(session.id);
+              onSelectSession(session.id);
             }}
           >
-            {abortingSessionId === session.id ? "Stopping" : "Stop Pi"}
+            {isSelected ? "Open" : "Open session"}
           </button>
-        ) : null}
+          {showStopAction ? (
+            <button
+              className={tokens.button.quiet}
+              disabled={session.status === "aborting" || abortingSessionId === session.id}
+              type="button"
+              onClick={() => {
+                void onAbortSession(session.id);
+              }}
+            >
+              {session.status === "aborting" || abortingSessionId === session.id
+                ? "Stopping"
+                : "Stop Pi"}
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {session.error ? <p className="mt-2 text-rosey">{session.error}</p> : null}
-
-      {visibleOutputLines.length > 0 ? (
-        <div className="mt-2 space-y-1">
-          {visibleOutputLines.map((line) => (
-            <p
-              className="truncate font-mono text-[11px] text-muted"
-              key={`${line.timestamp}-${line.message}`}
-            >
-              [{line.stream}] {line.message}
-            </p>
-          ))}
-        </div>
+      {lastActivity ? (
+        <p className="mt-2 truncate text-muted">
+          Last activity: <span className="text-ink">{lastActivity.title}</span> -{" "}
+          {lastActivity.summary}
+        </p>
       ) : null}
+
+      {session.error ? <p className="mt-2 text-rosey">{session.error}</p> : null}
     </div>
   );
 }
@@ -440,7 +473,6 @@ function getPiRunnerStatusDotClassName(status: PiRunnerSessionSnapshot["status"]
       return tokens.statusDot.unknown;
   }
 }
-
 interface PullRequestStateMarkProps {
   isDraft: boolean;
 }
