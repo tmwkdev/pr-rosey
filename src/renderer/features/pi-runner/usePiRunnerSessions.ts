@@ -16,6 +16,7 @@ export function usePiRunnerSessions() {
   const [error, setError] = useState<string | null>(null);
   const [startingPullRequestUrl, setStartingPullRequestUrl] = useState<string | null>(null);
   const [abortingSessionId, setAbortingSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -39,6 +40,7 @@ export function usePiRunnerSessions() {
         session,
         ...currentSessions.filter((currentSession) => currentSession.id !== session.id),
       ]);
+      setSelectedSessionId(session.id);
     } catch (startError) {
       setError(
         startError instanceof Error
@@ -69,6 +71,10 @@ export function usePiRunnerSessions() {
   }, []);
 
   const hasActiveSession = useMemo(() => sessions.some(isActiveSession), [sessions]);
+  const selectedSession = useMemo(
+    () => sessions.find((session) => session.id === selectedSessionId) ?? null,
+    [selectedSessionId, sessions],
+  );
 
   useEffect(() => {
     void refreshSessions();
@@ -88,12 +94,31 @@ export function usePiRunnerSessions() {
     };
   }, [hasActiveSession, refreshSessions]);
 
+  useEffect(() => {
+    if (selectedSessionId || sessions.length === 0) {
+      return;
+    }
+
+    setSelectedSessionId(sessions[0].id);
+  }, [selectedSessionId, sessions]);
+
+  useEffect(() => {
+    if (!selectedSessionId || selectedSession) {
+      return;
+    }
+
+    setSelectedSessionId(sessions[0]?.id ?? null);
+  }, [selectedSession, selectedSessionId, sessions]);
+
   return {
     abortingSessionId,
     abortSession,
     error,
     hasActiveSession,
     refreshSessions,
+    selectedSession,
+    selectedSessionId,
+    selectSession: setSelectedSessionId,
     sessions,
     startingPullRequestUrl,
     startRepositoryVerification,

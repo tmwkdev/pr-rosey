@@ -4,6 +4,32 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-07 Pi Chatbox Tool Display Receipt
+
+- Approved scope: chat-approved follow-up to make the Pi session console behave like a normal AI
+  chatbot and stop displaying tool calls, successful tool output, and file contents as human chat.
+- Changed: reshaped `PiSessionConsole` around a conventional chat structure with a compact header,
+  collapsible session details, one chronological feed, right-aligned user messages, left-aligned Pi
+  messages, centered compact system activity, and a disabled `Message Pi` composer with no new IPC
+  or steering behavior. Follow-up fix filters tool-only assistant messages and `toolResult` entries
+  out of the renderer conversation, prevents successful tool result text from becoming activity
+  summaries, hides noisy turn-start events, and collapses adjacent tool activity into a single
+  compact `Pi used tools` row instead of pages of tool-call rows or machine-details cards.
+- Files changed: `src/main/piRunnerService.ts`, `src/main/piRunnerService.test.ts`,
+  `src/shared/piRunner.ts`, `src/shared/piRunner.test.ts`,
+  `src/renderer/features/pi-runner/PiSessionConsole.tsx`, and this progress note.
+- Verification: `npm test -- --run src/main/piRunnerService.test.ts src/shared/piRunner.test.ts`
+  passed; `npm run check` passed; `npm run dev` launched Electron/Vite at
+  `http://localhost:5174/` because 5173 was occupied; `curl -I http://localhost:5174/` returned
+  HTTP 200 before shutdown.
+- Review: independent reviewer found no findings for the updated normalization scope and reran the
+  focused Pi runner tests successfully. Follow-up reviewer found and confirmed fixes for tool
+  rollups crossing chat-message boundaries and for `Tool activity` names missing from compact
+  summaries; reviewer reran `npm run check` successfully.
+- Remaining risk: in-app Browser visual inspection could not run because the Browser plugin reported
+  `Browser is not available: iab`; compact pill display was verified by code inspection and app
+  launch smoke, not by a captured screenshot.
+
 ## 2026-06-06 Pi Repository Verification Receipt
 
 - Approved scope: chat-approved first Pi integration checkpoint for clicking a PR-row action,
@@ -28,6 +54,33 @@ into `docs/plans/completed/` when it matters later.
   installed/configured, mapped repositories are used directly instead of managed worktrees, and
   in-app Browser visual verification could not run because the Browser plugin reported
   `Browser is not available: iab`.
+
+## 2026-06-06 Pi Session Console UI Receipt
+
+- Approved scope: `docs/plans/active/pi-session-console-ui.md`, turning the mockup into a real
+  selected-session console on the pull-request screen while keeping rows compact and steering
+  disabled.
+- Changed: added the Pi SDK package, moved the runner integration from subprocess/RPC stdout
+  parsing to `AgentSession`, restricted Pi to read-only tools (`read`, `grep`, `find`, `ls`),
+  added renderer-safe conversation messages and operational activity summaries, replaced long row
+  output with compact last-activity evidence, added selected-session state, and added a split Pi
+  session console with metadata, status, conversation, grouped activity, errors, exit state, stop
+  path, and a disabled steering composer.
+- Files changed: `src/shared/piRunner.ts`, `src/shared/piRunner.test.ts`,
+  `src/main/piRunnerService.ts`, `src/main/piRunnerService.test.ts`,
+  `src/renderer/features/pi-runner/usePiRunnerSessions.ts`,
+  `src/renderer/features/pi-runner/PiSessionConsole.tsx`,
+  `src/renderer/features/pull-requests/PullRequestsPanel.tsx`,
+  `src/renderer/App.tsx`, `package.json`, `package-lock.json`, and this progress note.
+- Verification: targeted Pi runner tests passed; `npm run lint`, `npm run typecheck`,
+  `npm run check`, and `npm audit --omit=dev` passed; `npm run dev` launched Electron/Vite at
+  `http://localhost:5173/`, and `curl -I /` returned HTTP 200.
+- Review: separate-agent review found and confirmed fixes for read-only tool gating, failed
+  AgentSession startup cleanup, and `agent_end.willRetry` handling. A follow-up review found no
+  blocking findings and independently ran `npm run check`.
+- Remaining risk: in-app Browser visual inspection and screenshot capture could not run because
+  the Browser plugin reported `Browser is not available: iab`; no live Pi AgentSession run was
+  visually inspected in the Electron window.
 
 ## 2026-06-05 Brand Asset Receipt
 
@@ -154,7 +207,8 @@ into `docs/plans/completed/` when it matters later.
 
 ## Current State
 
-- There is no active product plan in `docs/plans/active/`.
+- Active plans exist under `docs/plans/active/`; do not continue past the latest approved
+  checkpoint without explicit human approval.
 - Product scope remains local-first Electron PR monitoring for the current GitHub user.
 - Current implemented surface:
   - Dependency readiness checks for `gh`, `gh auth status`, and `git`.
@@ -164,6 +218,8 @@ into `docs/plans/completed/` when it matters later.
   - Manual refresh for authored and review-requested PR sections, plus PR URL
     browser handoff through typed preload IPC.
   - Full-window Electron renderer shell with readiness and pull-request panels.
+  - User-started Pi repository verification sessions through main-process subprocess supervision,
+    visible compact row evidence, abort support, durable log paths, and a selected-session console.
 
 ## Latest Verified Evidence
 
@@ -243,8 +299,8 @@ into `docs/plans/completed/` when it matters later.
 
 ## Known Gaps And Risk
 
-- No active approved product work is available. Do not continue product work without
-  a new active plan or explicit human approval.
+- Do not continue product work beyond the current approval checkpoint without explicit human
+  approval.
 - CI history noted a static-analysis workflow with lint/typecheck; confirm whether
   tests and build are expected in CI before relying on CI as the full verification gate.
 - Manual Electron verification has mostly been terminal-level smoke launch evidence;

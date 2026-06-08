@@ -1,12 +1,11 @@
-import { EventEmitter } from "node:events";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   abortPiRunnerSession,
   createPiRepositoryVerificationPrompt,
+  listPiRunnerSessions,
   resetPiRunnerSessionsForTests,
   startPiRepositoryVerification,
 } from "@/main/piRunnerService";
@@ -14,33 +13,70 @@ import { saveRepositoryMapping } from "@/main/repositoryMappingService";
 import type { ShellCommandResult } from "@/main/shellCommand";
 import type { PullRequestSummary } from "@/shared/pullRequests";
 
-class FakePiProcess extends EventEmitter {
-  readonly pid = 12345;
-  readonly stdin = new PassThrough();
-  readonly stdout = new PassThrough();
-  readonly stderr = new PassThrough();
-  killedWithSignal: string | null = null;
-  stdinWrites: string[] = [];
+type FakeAgentSessionEvent = {
+  args?: unknown;
+  isError?: boolean;
+  message?: unknown;
+  messages?: unknown[];
+  result?: unknown;
+  toolName?: string;
+  type: string;
+  willRetry?: boolean;
+};
 
-  constructor() {
-    super();
+class FakeAgentSession {
+  readonly sessionFile = "/tmp/pi-session.jsonl";
+  readonly sessionId = "pi-session-1";
+  abortCalled = false;
+  disposed = false;
+  messages: unknown[] = [];
+  prompts: string[] = [];
+  private listeners: Array<(event: FakeAgentSessionEvent) => void> = [];
 
-    this.stdin.on("data", (chunk) => {
-      this.stdinWrites.push(chunk.toString());
-    });
+  abort(): Promise<void> {
+    this.abortCalled = true;
+    return Promise.resolve();
   }
 
-  kill(signal?: NodeJS.Signals): boolean {
-    this.killedWithSignal = signal ?? null;
-    return true;
+  dispose(): void {
+    this.disposed = true;
+  }
+
+  emit(event: FakeAgentSessionEvent): void {
+    for (const listener of this.listeners) {
+      listener(event);
+    }
+  }
+
+  prompt(text: string): Promise<void> {
+    this.prompts.push(text);
+    this.messages = [
+      ...this.messages,
+      {
+        role: "user",
+        content: text,
+        timestamp: Date.parse("2026-06-06T12:00:00.000Z"),
+      },
+    ];
+    this.emit({ type: "agent_start" });
+    this.emit({ type: "message_end", message: this.messages[0] });
+    return Promise.resolve();
+  }
+
+  subscribe(listener: (event: FakeAgentSessionEvent) => void): () => void {
+    this.listeners.push(listener);
+
+    return () => {
+      this.listeners = this.listeners.filter((currentListener) => currentListener !== listener);
+    };
   }
 }
 
-type SpawnCall = {
-  args: string[];
-  command: string;
+type AgentSessionCall = {
   cwd: string;
-  process: FakePiProcess;
+  session: FakeAgentSession;
+  sessionDir: string;
+  tools: readonly string[];
 };
 
 let userDataPath: string;
@@ -112,12 +148,12 @@ function createPullRequestSummary(): PullRequestSummary {
   };
 }
 
-function createTestSpawnProcess(calls: SpawnCall[]) {
-  return (command: string, args: string[], options: { cwd: string }) => {
-    const process = new FakePiProcess();
-    calls.push({ command, args, cwd: options.cwd, process });
+function createTestAgentSessionFactory(calls: AgentSessionCall[]) {
+  return async (input: { cwd: string; sessionDir: string; tools: readonly string[] }) => {
+    const session = new FakeAgentSession();
+    calls.push({ ...input, session });
 
-    return process;
+    return session;
   };
 }
 
@@ -127,7 +163,7 @@ describe("pi runner service", () => {
 
     expect(prompt).toContain("Expected repository: owner/repo");
     expect(prompt).toContain("Working directory: /tmp/repo");
-    expect(prompt).toContain("Use only read-only commands");
+    expect(prompt).toContain("Only read, list, find, or grep files");
     expect(prompt).toContain("Do not edit files, commit, push, merge");
     expect(prompt).toContain("VERIFIED");
   });
@@ -144,10 +180,10 @@ describe("pi runner service", () => {
     ).rejects.toThrow("Map owner/repo to a trusted local clone in Settings before starting Pi.");
   });
 
-  it("starts Pi RPC in the mapped repository and sends the verification prompt", async () => {
+  it("starts a Pi AgentSession in the mapped repository and sends the verification prompt", async () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
-    const spawnCalls: SpawnCall[] = [];
+    const agentSessionCalls: AgentSessionCall[] = [];
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -159,37 +195,47 @@ describe("pi runner service", () => {
         userDataPath,
         runCommand,
         createId: () => "session-1",
-        spawnProcess: createTestSpawnProcess(spawnCalls),
+        createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
         now: () => "2026-06-06T12:00:00.000Z",
       },
       createPullRequestSummary(),
     );
 
-    expect(spawnCalls).toHaveLength(1);
-    expect(spawnCalls[0]).toMatchObject({
-      command: "pi",
-      args: ["--mode", "rpc", "--no-session", "--name", "pr-rosey owner/repo#12"],
+    expect(agentSessionCalls).toHaveLength(1);
+    expect(agentSessionCalls[0]).toMatchObject({
       cwd: repositoryRootPath,
+      sessionDir: path.join(userDataPath, "pi-agent-sessions", "session-1"),
+      tools: ["read", "grep", "find", "ls"],
     });
-    expect(spawnCalls[0].process.stdinWrites.join("")).toContain('"type":"prompt"');
-    expect(spawnCalls[0].process.stdinWrites.join("")).toContain("Expected repository: owner/repo");
+    expect(agentSessionCalls[0].session.prompts.join("")).toContain(
+      "Expected repository: owner/repo",
+    );
     expect(session).toMatchObject({
       id: "session-1",
       status: "running",
       localPath: repositoryRootPath,
-      pid: 12345,
+      pid: null,
       logFilePath: path.join(userDataPath, "pi-runner-logs", "session-1.jsonl"),
     });
+    expect(session.conversation).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "user",
+          body: expect.stringContaining("Expected repository: owner/repo"),
+        }),
+      ]),
+    );
 
     const logFile = await readFile(session.logFilePath, "utf8");
-    expect(logFile).toContain("Starting pi --mode rpc --no-session");
+    expect(logFile).toContain("Starting Pi AgentSession");
+    expect(logFile).toContain("Created Pi AgentSession");
     expect(logFile).toContain("Sent read-only repository verification prompt");
   });
 
-  it("records stdout summaries and aborts an active Pi process", async () => {
+  it("records structured AgentSession events and aborts an active Pi session", async () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
-    const spawnCalls: SpawnCall[] = [];
+    const agentSessionCalls: AgentSessionCall[] = [];
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -201,13 +247,65 @@ describe("pi runner service", () => {
         userDataPath,
         runCommand,
         createId: () => "session-2",
-        spawnProcess: createTestSpawnProcess(spawnCalls),
+        createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
         now: () => "2026-06-06T12:00:00.000Z",
       },
       createPullRequestSummary(),
     );
 
-    spawnCalls[0].process.stdout.write('{"type":"response","command":"prompt","success":true}\n');
+    const assistantMessage = {
+      role: "assistant",
+      content: [{ type: "text", text: "VERIFIED /tmp/repo" }],
+      stopReason: "stop",
+      timestamp: Date.parse("2026-06-06T12:00:01.000Z"),
+    };
+    agentSessionCalls[0].session.messages = [
+      ...agentSessionCalls[0].session.messages,
+      assistantMessage,
+    ];
+    agentSessionCalls[0].session.emit({ type: "message_update", message: assistantMessage });
+    agentSessionCalls[0].session.emit({
+      type: "tool_execution_start",
+      toolName: "bash",
+      args: { command: "pwd" },
+    });
+    agentSessionCalls[0].session.emit({
+      type: "tool_execution_end",
+      toolName: "bash",
+      args: { command: "pwd" },
+      result: { content: [{ type: "text", text: repositoryRootPath }] },
+      isError: false,
+    });
+
+    const runningSession = listPiRunnerSessions()[0];
+    expect(runningSession.conversation).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "assistant",
+          body: "VERIFIED /tmp/repo",
+        }),
+      ]),
+    );
+    expect(runningSession.activityEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "tool-activity",
+          title: "Tool started: bash",
+        }),
+        expect.objectContaining({
+          kind: "tool-activity",
+          title: "Tool finished: bash",
+          summary: "bash finished.",
+        }),
+      ]),
+    );
+    expect(runningSession.activityEvents).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          summary: repositoryRootPath,
+        }),
+      ]),
+    );
 
     const abortingSession = await abortPiRunnerSession(
       { userDataPath, now: () => "2026-06-06T12:00:01.000Z" },
@@ -215,12 +313,17 @@ describe("pi runner service", () => {
     );
 
     expect(abortingSession.status).toBe("aborting");
-    expect(spawnCalls[0].process.killedWithSignal).toBe("SIGTERM");
-    expect(abortingSession.outputLines.map((line) => line.message)).toContain(
-      "Pi response for prompt: accepted",
-    );
+    expect(agentSessionCalls[0].session.abortCalled).toBe(true);
     expect(abortingSession.outputLines.map((line) => line.message)).toContain(
       "Abort requested by user.",
+    );
+    expect(abortingSession.activityEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "system",
+          title: "Stop requested",
+        }),
+      ]),
     );
 
     await expect(
@@ -229,10 +332,156 @@ describe("pi runner service", () => {
           userDataPath,
           runCommand,
           createId: () => "session-3",
-          spawnProcess: createTestSpawnProcess(spawnCalls),
+          createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
         },
         createPullRequestSummary(),
       ),
     ).rejects.toThrow("A Pi verification session is already running.");
+  });
+
+  it("keeps tool-only assistant messages and tool results out of the human conversation", async () => {
+    const repositoryRootPath = path.join(userDataPath, "repo");
+    const runCommand = createTestRunCommand(repositoryRootPath);
+    const agentSessionCalls: AgentSessionCall[] = [];
+
+    await saveRepositoryMapping(
+      { userDataPath, runCommand },
+      { repositoryNameWithOwner: "owner/repo", localPath: repositoryRootPath },
+    );
+
+    await startPiRepositoryVerification(
+      {
+        userDataPath,
+        runCommand,
+        createId: () => "session-tool-only",
+        createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        now: () => "2026-06-06T12:00:00.000Z",
+      },
+      createPullRequestSummary(),
+    );
+
+    agentSessionCalls[0].session.messages = [
+      ...agentSessionCalls[0].session.messages,
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "tool-1",
+            name: "read",
+            arguments: { path: "src/main/piRunnerService.ts" },
+          },
+        ],
+        stopReason: "toolUse",
+        timestamp: Date.parse("2026-06-06T12:00:01.000Z"),
+      },
+      {
+        role: "toolResult",
+        toolCallId: "tool-1",
+        toolName: "read",
+        content: [{ type: "text", text: "file contents that should stay out of chat" }],
+        isError: false,
+        timestamp: Date.parse("2026-06-06T12:00:02.000Z"),
+      },
+    ];
+    agentSessionCalls[0].session.emit({
+      type: "message_end",
+      message: agentSessionCalls[0].session.messages.at(-1),
+    });
+
+    const runningSession = listPiRunnerSessions()[0];
+    expect(runningSession.conversation).toEqual(
+      expect.not.arrayContaining([
+        expect.objectContaining({
+          body: expect.stringContaining("Requested read"),
+        }),
+        expect.objectContaining({
+          body: expect.stringContaining("file contents that should stay out of chat"),
+        }),
+        expect.objectContaining({
+          title: "read result",
+        }),
+      ]),
+    );
+  });
+
+  it("records failed startup and does not leave an active blocker when AgentSession creation fails", async () => {
+    const repositoryRootPath = path.join(userDataPath, "repo");
+    const runCommand = createTestRunCommand(repositoryRootPath);
+
+    await saveRepositoryMapping(
+      { userDataPath, runCommand },
+      { repositoryNameWithOwner: "owner/repo", localPath: repositoryRootPath },
+    );
+
+    await expect(
+      startPiRepositoryVerification(
+        {
+          userDataPath,
+          runCommand,
+          createId: () => "session-failed",
+          createAgentSession: async () => {
+            throw new Error("SDK unavailable");
+          },
+          now: () => "2026-06-06T12:00:00.000Z",
+        },
+        createPullRequestSummary(),
+      ),
+    ).rejects.toThrow("SDK unavailable");
+
+    const failedSession = listPiRunnerSessions()[0];
+    expect(failedSession).toMatchObject({
+      id: "session-failed",
+      status: "failed",
+      error: "SDK unavailable",
+      exitCode: 1,
+    });
+
+    const agentSessionCalls: AgentSessionCall[] = [];
+    await expect(
+      startPiRepositoryVerification(
+        {
+          userDataPath,
+          runCommand,
+          createId: () => "session-after-failure",
+          createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        },
+        createPullRequestSummary(),
+      ),
+    ).resolves.toMatchObject({
+      id: "session-after-failure",
+      status: "running",
+    });
+  });
+
+  it("keeps an AgentSession running when Pi reports agent_end with willRetry", async () => {
+    const repositoryRootPath = path.join(userDataPath, "repo");
+    const runCommand = createTestRunCommand(repositoryRootPath);
+    const agentSessionCalls: AgentSessionCall[] = [];
+
+    await saveRepositoryMapping(
+      { userDataPath, runCommand },
+      { repositoryNameWithOwner: "owner/repo", localPath: repositoryRootPath },
+    );
+
+    await startPiRepositoryVerification(
+      {
+        userDataPath,
+        runCommand,
+        createId: () => "session-retry",
+        createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        now: () => "2026-06-06T12:00:00.000Z",
+      },
+      createPullRequestSummary(),
+    );
+
+    agentSessionCalls[0].session.emit({ type: "agent_end", messages: [], willRetry: true });
+
+    expect(listPiRunnerSessions()[0]).toMatchObject({
+      id: "session-retry",
+      status: "running",
+      exitedAt: null,
+    });
+    expect(agentSessionCalls[0].session.disposed).toBe(false);
   });
 });
