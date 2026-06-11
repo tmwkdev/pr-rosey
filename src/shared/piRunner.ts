@@ -208,12 +208,15 @@ function parseJsonRecord(message: string): JsonRecord | null {
 }
 
 function createSystemActivityEvent(line: PiRunnerLogLine): PiRunnerActivityEvent {
-  if (line.message.startsWith("Sent read-only repository verification prompt")) {
+  if (
+    line.message.startsWith("Sent read-only babysit prompt") ||
+    line.message.startsWith("Sent read-only repository verification prompt")
+  ) {
     return {
       timestamp: line.timestamp,
       kind: "user-prompt",
       status: "success",
-      title: "Repository verification prompt",
+      title: "Babysit prompt",
       summary: line.message,
       detail: null,
       stream: line.stream,

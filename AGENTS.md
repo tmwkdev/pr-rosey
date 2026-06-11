@@ -98,6 +98,7 @@ Repo-local skills live under `skills/`.
 
 - Implementing agents should use `skills/pr-rosey-implementer/SKILL.md`.
 - Review agents should use `skills/pr-rosey-reviewer/SKILL.md`.
+- PR babysitting agents should use `skills/pr-watch-skill/SKILL.md`.
 - If the agent runtime does not auto-discover repo-local skills, read the relevant `SKILL.md`
   directly before starting.
 - The review gate must be performed by a separate agent from the implementer. The implementing agent

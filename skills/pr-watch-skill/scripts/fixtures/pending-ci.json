@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "pr-watch-snapshot/v1",
+  "collectedAt": "2026-06-10T10:00:00.000Z",
+  "repository": "example/repo",
+  "pr": {
+    "number": 11,
+    "url": "https://github.com/example/repo/pull/11",
+    "title": "Pending checks",
+    "lifecycle": "open",
+    "headBranch": "feature/pending",
+    "baseBranch": "main",
+    "headSha": "sha-pending",
+    "mergeable": "UNKNOWN",
+    "mergeState": "CLEAN",
+    "reviewDecision": "",
+    "isDraft": false
+  },
+  "ci": {
+    "currentSha": "sha-pending",
+    "checks": [
+      {
+        "name": "Unit tests",
+        "result": "pending",
+        "workflow": "CI",
+        "url": "https://github.com/example/repo/actions/runs/11",
+        "headSha": "sha-pending"
+      }
+    ]
+  },
+  "feedback": {
+    "items": []
+  }
+}

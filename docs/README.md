@@ -11,10 +11,13 @@ the next agent or human who needs to make a product change.
 - `agent-runner.md` - managed PR runner direction, Pi integration, auth, worktrees, and delivery
   phases
 - `frontend.md` - renderer styling, component, token, badge, and status guidance
+- `babysit-skill-goal.md` - PR babysitting skill success scorecard
+- `babysit-skill-adoption-review.md` - human similarity-review checklist for adopting the PR watch
+  skill
 - `progress.md` - latest handoff state and verification notes
 - `plans/` - active and completed work items
 - `plan-template.md` - template for approved work items
-- `../skills/` - repo-local implementer and reviewer skills for agent workflow
+- `../skills/` - repo-local implementer, reviewer, and PR watch skills for agent workflow
 
 ## Documentation Bias
 

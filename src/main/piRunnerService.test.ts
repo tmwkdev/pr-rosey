@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   abortPiRunnerSession,
-  createPiRepositoryVerificationPrompt,
+  createPiBabysitPrompt,
   listPiRunnerSessions,
   resetPiRunnerSessionsForTests,
   startPiRepositoryVerification,
@@ -158,14 +158,17 @@ function createTestAgentSessionFactory(calls: AgentSessionCall[]) {
 }
 
 describe("pi runner service", () => {
-  it("builds a read-only repository verification prompt", () => {
-    const prompt = createPiRepositoryVerificationPrompt(createPullRequestSummary(), "/tmp/repo");
+  it("builds a read-only babysit prompt with PR and CI context", () => {
+    const prompt = createPiBabysitPrompt(createPullRequestSummary(), "/tmp/repo");
 
-    expect(prompt).toContain("Expected repository: owner/repo");
+    expect(prompt).toContain("Repository: owner/repo");
+    expect(prompt).toContain("Pull request: #12 Test pull request");
+    expect(prompt).toContain("Head branch: feature");
+    expect(prompt).toContain("CI summary: passing");
     expect(prompt).toContain("Working directory: /tmp/repo");
     expect(prompt).toContain("Only read, list, find, or grep files");
     expect(prompt).toContain("Do not edit files, commit, push, merge");
-    expect(prompt).toContain("VERIFIED");
+    expect(prompt).toContain("BABYSIT REPORT");
   });
 
   it("refuses to start Pi without a trusted repository mapping", async () => {
@@ -180,7 +183,7 @@ describe("pi runner service", () => {
     ).rejects.toThrow("Map owner/repo to a trusted local clone in Settings before starting Pi.");
   });
 
-  it("starts a Pi AgentSession in the mapped repository and sends the verification prompt", async () => {
+  it("starts a Pi AgentSession in the mapped repository and sends the babysit prompt", async () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
@@ -207,9 +210,8 @@ describe("pi runner service", () => {
       sessionDir: path.join(userDataPath, "pi-agent-sessions", "session-1"),
       tools: ["read", "grep", "find", "ls"],
     });
-    expect(agentSessionCalls[0].session.prompts.join("")).toContain(
-      "Expected repository: owner/repo",
-    );
+    expect(agentSessionCalls[0].session.prompts.join("")).toContain("Repository: owner/repo");
+    expect(agentSessionCalls[0].session.prompts.join("")).toContain("BABYSIT REPORT");
     expect(session).toMatchObject({
       id: "session-1",
       status: "running",
@@ -221,7 +223,7 @@ describe("pi runner service", () => {
       expect.arrayContaining([
         expect.objectContaining({
           role: "user",
-          body: expect.stringContaining("Expected repository: owner/repo"),
+          body: expect.stringContaining("Repository: owner/repo"),
         }),
       ]),
     );
@@ -229,7 +231,7 @@ describe("pi runner service", () => {
     const logFile = await readFile(session.logFilePath, "utf8");
     expect(logFile).toContain("Starting Pi AgentSession");
     expect(logFile).toContain("Created Pi AgentSession");
-    expect(logFile).toContain("Sent read-only repository verification prompt");
+    expect(logFile).toContain("Sent read-only babysit prompt");
   });
 
   it("records structured AgentSession events and aborts an active Pi session", async () => {
@@ -255,7 +257,7 @@ describe("pi runner service", () => {
 
     const assistantMessage = {
       role: "assistant",
-      content: [{ type: "text", text: "VERIFIED /tmp/repo" }],
+      content: [{ type: "text", text: "BABYSIT REPORT /tmp/repo" }],
       stopReason: "stop",
       timestamp: Date.parse("2026-06-06T12:00:01.000Z"),
     };
@@ -282,7 +284,7 @@ describe("pi runner service", () => {
       expect.arrayContaining([
         expect.objectContaining({
           role: "assistant",
-          body: "VERIFIED /tmp/repo",
+          body: "BABYSIT REPORT /tmp/repo",
         }),
       ]),
     );
@@ -336,7 +338,7 @@ describe("pi runner service", () => {
         },
         createPullRequestSummary(),
       ),
-    ).rejects.toThrow("A Pi verification session is already running.");
+    ).rejects.toThrow("A Pi babysit session is already running.");
   });
 
   it("keeps tool-only assistant messages and tool results out of the human conversation", async () => {

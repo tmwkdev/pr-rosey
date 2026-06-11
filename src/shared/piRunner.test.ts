@@ -87,11 +87,11 @@ describe("pi runner shared helpers", () => {
       createPiRunnerActivityEvent({
         timestamp,
         stream: "system",
-        message: "Sent read-only repository verification prompt for owner/repo#12.",
+        message: "Sent read-only babysit prompt for owner/repo#12.",
       }),
     ).toMatchObject({
       kind: "user-prompt",
-      title: "Repository verification prompt",
+      title: "Babysit prompt",
     });
   });
 });
