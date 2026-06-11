@@ -30,7 +30,7 @@ type PiRunnerPanelState = {
   startingPullRequestUrl: string | null;
   abortSession: (sessionId: string) => Promise<void>;
   selectSession: (sessionId: string | null) => void;
-  startRepositoryVerification: (pullRequest: PullRequestSummary) => Promise<void>;
+  startBabysit: (pullRequest: PullRequestSummary) => Promise<void>;
 };
 
 type PullRequestSectionCopy = {
@@ -333,10 +333,10 @@ function PullRequestRow({
           disabled={isPiActionDisabled}
           type="button"
           onClick={() => {
-            void piRunner.startRepositoryVerification(pullRequest);
+            void piRunner.startBabysit(pullRequest);
           }}
         >
-          {isStartingPi ? "Starting Pi" : "Verify with Pi"}
+          {isStartingPi ? "Starting babysit" : "Babysit"}
         </button>
         <button
           className={`${tokens.button.quiet} sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100`}

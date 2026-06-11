@@ -47,9 +47,9 @@ export function PiSessionConsole({
     return (
       <aside className="flex h-full min-h-[28rem] flex-col bg-[#0f110e]">
         <div className="border-b border-line bg-panel px-5 py-5">
-          <h2 className="text-sm font-semibold text-ink">Pi session</h2>
+          <h2 className="text-sm font-semibold text-ink">Babysit session</h2>
           <p className="mt-1 text-xs text-muted">
-            Start Pi from a pull request, or open a visible session from a PR row.
+            Start Babysit from a pull request, or open a visible session from a PR row.
           </p>
         </div>
         <div className="flex min-h-0 flex-1 items-center justify-center px-5 text-center">
@@ -186,7 +186,7 @@ function SessionStateNote({ session }: SessionStateNoteProps) {
 
   return (
     <div className="border-b border-line bg-blue-400/10 px-5 py-3 text-xs text-muted">
-      Pi is active. The renderer can stop the process, but follow-up steering is not enabled yet.
+      Babysit is active. The renderer can stop Pi, but follow-up steering is not enabled yet.
     </div>
   );
 }

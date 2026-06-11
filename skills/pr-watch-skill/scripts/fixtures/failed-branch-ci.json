@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "pr-watch-snapshot/v1",
+  "collectedAt": "2026-06-10T10:00:00.000Z",
+  "repository": "example/repo",
+  "pr": {
+    "number": 13,
+    "url": "https://github.com/example/repo/pull/13",
+    "title": "Branch failure",
+    "lifecycle": "open",
+    "headBranch": "feature/broken-test",
+    "baseBranch": "main",
+    "headSha": "sha-branch-fail",
+    "mergeable": "UNKNOWN",
+    "mergeState": "CLEAN",
+    "reviewDecision": "",
+    "isDraft": false
+  },
+  "ci": {
+    "currentSha": "sha-branch-fail",
+    "checks": [
+      {
+        "name": "Vitest",
+        "result": "fail",
+        "workflow": "CI",
+        "url": "https://github.com/example/repo/actions/runs/13/job/1",
+        "headSha": "sha-branch-fail",
+        "failureCause": "branch"
+      }
+    ]
+  },
+  "feedback": {
+    "items": []
+  }
+}

@@ -4,6 +4,52 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-11 Babysit App Surface Receipt
+
+- Approved scope: user-reported follow-up that the app still only showed `Verify with Pi`, so the
+  PR row needed a real Babysit action and the runner prompt needed to request PR babysitting rather
+  than repository verification.
+- Changed: PR rows now render `Babysit` / `Starting babysit`; the Pi runner hook exposes
+  `startBabysit`; the session console empty/active copy says Babysit; the main-process Pi prompt now
+  includes PR title, URL, author, head branch, CI summary, failing checks, pending checks, workspace
+  path, and asks for a read-only `BABYSIT REPORT` with the next safe user-visible action.
+- Safety preserved: Pi remains limited to read-only tools (`read`, `grep`, `find`, `ls`), and the
+  prompt still forbids shell commands, edits, commits, pushes, merges, GitHub comments, CI reruns,
+  and follow-up work.
+- Verification: targeted Pi runner tests passed; `npm run check` passed with 42 tests; `npm run dev`
+  launched Electron/Vite at `http://localhost:5173/`, and `curl -I` returned HTTP 200; built output
+  scan confirmed `Babysit` and `BABYSIT REPORT` are present while `Verify with Pi` is absent.
+- Review: separate reviewer found no findings and independently reran the targeted Pi tests plus
+  `npm run check`.
+- Remaining risk: in-app Browser visual DOM verification could not run because the Browser plugin
+  reported `Browser is not available: iab`; verification used tests, dev launch smoke, HTTP 200, and
+  built-output text scan.
+
+## 2026-06-09 PR Watch Skill Receipt
+
+- Approved scope: build an original repo-owned PR babysitting skill with TypeScript scripts,
+  references, fixtures, tests, and a successful PR babysit run, using
+  `docs/babysit-skill-goal.md` as the scorecard.
+- Changed: added `skills/pr-watch-skill/` with concise skill instructions, a local-first
+  `pr-watch.ts` CLI, stable structured JSON reports, pure fixture-testable decision logic, local
+  seen-feedback and retry-budget state, concurrent-watch lock protection, CI/review/state
+  references, and fixtures covering the required babysitting scenarios.
+- Files changed: `skills/pr-watch-skill/**`, `package.json`, `tsconfig.json`, `AGENTS.md`,
+  `docs/README.md`, `docs/babysit-skill-goal.md`, and this progress note.
+- Verification: `npm test -- --run skills/pr-watch-skill/scripts/pr-watch.test.ts` passed with 16
+  tests; `npm run check` passed with 42 tests; live dogfood
+  `npm run pr-watch -- 6 --repo tmwkdev/pr-rosey --pretty` captured PR #6, current head SHA
+  `9085c72112a0903d3feeca17e96de978ebf85f4f`, the failed `Lint and typecheck` job URL, and selected
+  `diagnose_branch_failure` without a GitHub mutation.
+- Review: separate reviewer initially found cancelled/time-out checks could fall through to
+  readiness and that state was not persisted. Fixed both with regression tests. Follow-up review
+  found no findings and reran the focused skill tests plus `npm run check`.
+- Adoption aid: added `docs/babysit-skill-adoption-review.md` so the remaining human similarity
+  review has concrete pass/fail checks and file targets.
+- Remaining risk: the required human/source similarity review against the OpenAI babysit-pr skill
+  has not been performed. The implementation was written from the local scorecard and common GitHub
+  CLI behavior without consulting the OpenAI source.
+
 ## 2026-06-07 Pi Chatbox Tool Display Receipt
 
 - Approved scope: chat-approved follow-up to make the Pi session console behave like a normal AI
@@ -218,8 +264,8 @@ into `docs/plans/completed/` when it matters later.
   - Manual refresh for authored and review-requested PR sections, plus PR URL
     browser handoff through typed preload IPC.
   - Full-window Electron renderer shell with readiness and pull-request panels.
-  - User-started Pi repository verification sessions through main-process subprocess supervision,
-    visible compact row evidence, abort support, durable log paths, and a selected-session console.
+  - User-started Pi babysit sessions through main-process AgentSession supervision, visible compact
+    row evidence, abort support, durable log paths, and a selected-session console.
 
 ## Latest Verified Evidence
 

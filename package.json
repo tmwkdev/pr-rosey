@@ -12,7 +12,8 @@
     "format": "biome format --write .",
     "lint": "biome check .",
     "check": "npm run lint && npm run typecheck && npm test -- --run",
-    "test": "vitest"
+    "test": "vitest",
+    "pr-watch": "node skills/pr-watch-skill/scripts/pr-watch.ts"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.78.1",

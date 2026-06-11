@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "pr-watch-snapshot/v1",
+  "collectedAt": "2026-06-10T10:00:00.000Z",
+  "repository": "example/repo",
+  "pr": {
+    "number": 16,
+    "url": "https://github.com/example/repo/pull/16",
+    "title": "Needs review changes",
+    "lifecycle": "open",
+    "headBranch": "feature/review",
+    "baseBranch": "main",
+    "headSha": "sha-review",
+    "mergeable": "UNKNOWN",
+    "mergeState": "CLEAN",
+    "reviewDecision": "CHANGES_REQUESTED",
+    "isDraft": false
+  },
+  "ci": {
+    "currentSha": "sha-review",
+    "checks": [
+      {
+        "name": "Runner startup",
+        "result": "fail",
+        "workflow": "CI",
+        "url": "https://github.com/example/repo/actions/runs/16/job/1",
+        "headSha": "sha-review",
+        "failureCause": "infrastructure"
+      }
+    ]
+  },
+  "feedback": {
+    "items": [
+      {
+        "id": "review:100",
+        "kind": "review",
+        "author": "reviewer",
+        "body": "Please split this helper before rerunning CI.",
+        "submittedAt": "2026-06-10T09:55:00.000Z",
+        "state": "CHANGES_REQUESTED",
+        "actionable": true
+      }
+    ]
+  }
+}

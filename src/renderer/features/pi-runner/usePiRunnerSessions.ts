@@ -28,7 +28,7 @@ export function usePiRunnerSessions() {
     }
   }, []);
 
-  const startRepositoryVerification = useCallback(async (pullRequest: PullRequestSummary) => {
+  const startBabysit = useCallback(async (pullRequest: PullRequestSummary) => {
     setStartingPullRequestUrl(pullRequest.url);
     setError(null);
 
@@ -43,9 +43,7 @@ export function usePiRunnerSessions() {
       setSelectedSessionId(session.id);
     } catch (startError) {
       setError(
-        startError instanceof Error
-          ? startError.message
-          : "Could not start Pi repository verification.",
+        startError instanceof Error ? startError.message : "Could not start Pi babysit session.",
       );
     } finally {
       setStartingPullRequestUrl(null);
@@ -121,6 +119,6 @@ export function usePiRunnerSessions() {
     selectSession: setSelectedSessionId,
     sessions,
     startingPullRequestUrl,
-    startRepositoryVerification,
+    startBabysit,
   };
 }

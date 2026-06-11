@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "pr-watch-snapshot/v1",
+  "collectedAt": "2026-06-10T10:00:00.000Z",
+  "repository": "example/repo",
+  "pr": {
+    "number": 10,
+    "url": "https://github.com/example/repo/pull/10",
+    "title": "Closed work",
+    "lifecycle": "closed",
+    "headBranch": "feature/closed",
+    "baseBranch": "main",
+    "headSha": "sha-closed",
+    "mergeable": "UNKNOWN",
+    "mergeState": "UNKNOWN",
+    "reviewDecision": "",
+    "isDraft": false
+  },
+  "ci": {
+    "currentSha": "sha-closed",
+    "checks": []
+  },
+  "feedback": {
+    "items": []
+  }
+}

@@ -426,21 +426,34 @@ function createActivityEventFromAgentEvent(
   }
 }
 
-export function createPiRepositoryVerificationPrompt(
-  pullRequest: PullRequestSummary,
-  localPath: string,
-): string {
+export function createPiBabysitPrompt(pullRequest: PullRequestSummary, localPath: string): string {
+  const failingChecks = pullRequest.ciStatus.checks
+    .filter((check) => check.state === "failing")
+    .map((check) => check.name);
+  const pendingChecks = pullRequest.ciStatus.checks
+    .filter((check) => check.state === "pending")
+    .map((check) => check.name);
+
   return [
-    "You are being launched by pr-rosey for a read-only repository verification smoke test.",
-    `Expected repository: ${pullRequest.repository.nameWithOwner}`,
-    `Pull request: ${pullRequest.url}`,
+    "You are being launched by pr-rosey to babysit one pull request.",
+    `Repository: ${pullRequest.repository.nameWithOwner}`,
+    `Pull request: #${pullRequest.number} ${pullRequest.title}`,
+    `URL: ${pullRequest.url}`,
+    `Author: @${pullRequest.authorLogin}`,
+    `Head branch: ${pullRequest.headRefName}`,
+    `CI summary: ${pullRequest.ciStatus.state} (${pullRequest.ciStatus.passingCount} passing, ${pullRequest.ciStatus.failingCount} failing, ${pullRequest.ciStatus.pendingCount} pending, ${pullRequest.ciStatus.unknownCount} unknown)`,
+    `Failing checks: ${failingChecks.length > 0 ? failingChecks.join(", ") : "none"}`,
+    `Pending checks: ${pendingChecks.length > 0 ? pendingChecks.join(", ") : "none"}`,
     `Working directory: ${localPath}`,
-    "Inspect the available project files with read-only tools and summarize whether the workspace looks like the expected repository.",
+    "Inspect the repository with read-only tools and report the next safe babysitting step for this PR.",
+    "If CI is failing, identify the likely area to inspect next. If CI is pending, say what to wait for. If the PR looks ready, say so but do not stop just because CI is green.",
     "Only read, list, find, or grep files. Do not run shell commands.",
     "Do not edit files, commit, push, merge, comment on GitHub, rerun CI, or start follow-up work.",
-    "Reply with VERIFIED plus the evidence you inspected if the workspace appears correct; otherwise explain the mismatch.",
+    "Reply with BABYSIT REPORT, the evidence inspected, the current blocker or readiness state, and the next safe user-visible action.",
   ].join("\n");
 }
+
+export const createPiRepositoryVerificationPrompt = createPiBabysitPrompt;
 
 export function listPiRunnerSessions(): PiRunnerSessionSnapshot[] {
   return [...sessions.values()]
@@ -463,7 +476,7 @@ export async function startPiRepositoryVerification(
   pullRequest: PullRequestSummary,
 ): Promise<PiRunnerSessionSnapshot> {
   if ([...sessions.values()].some(isActiveSession)) {
-    throw new Error("A Pi verification session is already running.");
+    throw new Error("A Pi babysit session is already running.");
   }
 
   const mappings = await listRepositoryMappings(options);
@@ -603,9 +616,10 @@ export async function startPiRepositoryVerification(
   await recordSessionLine(
     session,
     "system",
-    `Sent read-only repository verification prompt for ${pullRequest.repository.nameWithOwner}#${pullRequest.number}.`,
+    `Sent read-only babysit prompt for ${pullRequest.repository.nameWithOwner}#${pullRequest.number}.`,
     nowIso(options),
   );
+  const prompt = createPiBabysitPrompt(pullRequest, inspection.localPath);
   session.conversation = [
     ...session.conversation,
     {
@@ -613,30 +627,23 @@ export async function startPiRepositoryVerification(
       role: "user",
       status: "pending",
       title: "Prompt",
-      body: createPiRepositoryVerificationPrompt(pullRequest, inspection.localPath),
+      body: prompt,
       timestamp: session.updatedAt,
     },
   ];
 
-  void agentSession
-    .prompt(createPiRepositoryVerificationPrompt(pullRequest, inspection.localPath))
-    .catch((error: unknown) => {
-      const timestamp = nowIso(options);
-      session.status = session.status === "aborting" ? "aborted" : "failed";
-      session.error = error instanceof Error ? error.message : "Pi AgentSession failed.";
-      session.exitedAt = timestamp;
-      session.exitCode = session.status === "aborted" ? 0 : 1;
-      session.updatedAt = timestamp;
-      runtimes.delete(session.id);
-      unsubscribe();
-      agentSession.dispose();
-      recordSessionLineAsync(
-        options,
-        session,
-        "system",
-        `Pi AgentSession failed: ${session.error}`,
-      );
-    });
+  void agentSession.prompt(prompt).catch((error: unknown) => {
+    const timestamp = nowIso(options);
+    session.status = session.status === "aborting" ? "aborted" : "failed";
+    session.error = error instanceof Error ? error.message : "Pi AgentSession failed.";
+    session.exitedAt = timestamp;
+    session.exitCode = session.status === "aborted" ? 0 : 1;
+    session.updatedAt = timestamp;
+    runtimes.delete(session.id);
+    unsubscribe();
+    agentSession.dispose();
+    recordSessionLineAsync(options, session, "system", `Pi AgentSession failed: ${session.error}`);
+  });
 
   return snapshotSession(session);
 }
