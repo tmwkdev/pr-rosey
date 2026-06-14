@@ -58,19 +58,28 @@ If any critical check fails, the skill fails regardless of the standard-check co
 ## Expected Artifact Shape
 
 ```text
+packages/pr-watch/
+  src/
+    cli.ts
+    decision.ts
+    githubClient.ts
+    lock.ts
+    state.ts
+    types.ts
+    watch.ts
+    pr-watch.test.ts
+  fixtures/
+    closed-pr.json
+    pending-ci.json
+    failed-branch-ci.json
+    failed-flaky-ci.json
+    exhausted-retry-budget.json
+    new-review-feedback.json
+    green-open-pr.json
 pr-watch-skill/
   SKILL.md
   scripts/
     pr-watch.ts
-    pr-watch.test.ts
-    fixtures/
-      closed-pr.json
-      pending-ci.json
-      failed-branch-ci.json
-      failed-flaky-ci.json
-      exhausted-retry-budget.json
-      new-review-feedback.json
-      green-open-pr.json
   references/
     ci-classification.md
     review-feedback-policy.md
@@ -78,8 +87,9 @@ pr-watch-skill/
     evaluation-scenarios.md
 ```
 
-The exact file names may change, but the final skill should preserve the same responsibilities:
-concise instructions, original TypeScript scripts, fixture-based tests, and focused references.
+The exact file names may change, but the final package and skill should preserve the same
+responsibilities: concise instructions, original TypeScript watcher code, fixture-based tests, and
+focused references.
 
 ## Required Evaluation Scenarios
 

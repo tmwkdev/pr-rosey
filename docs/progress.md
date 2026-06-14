@@ -4,6 +4,27 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-11 PR Watch Package Boundary Receipt
+
+- Approved scope: user-requested architecture treatment for `skills/pr-watch-skill/scripts/pr-watch.ts`
+  so core PR watch functionality is ready for growth without overengineering.
+- Changed: promoted PR watch code into private workspace package `packages/pr-watch/`, split the
+  watcher into explicit TypeScript modules for contracts, decision policy, GitHub CLI collection,
+  local state, locks, fixture loading, CLI parsing, and one-shot evaluation; moved fixtures and tests
+  with the package; kept `skills/pr-watch-skill/scripts/pr-watch.ts` as a compatibility wrapper; and
+  updated skill/docs references to point at the package boundary.
+- Safety preserved: watcher behavior remains local-first, `gh`-read-based, fixture-testable, and
+  non-mutating. No Electron, renderer, IPC, hosted backend, OAuth, AI-agent execution, GitHub write,
+  merge, push, comment, review-thread resolution, or CI rerun behavior was added.
+- Verification: `npm test -- --run packages/pr-watch/src/pr-watch.test.ts` passed with 16 tests;
+  direct package CLI, root `npm run pr-watch`, workspace `npm exec`, and skill-wrapper fixture
+  smokes all emitted `diagnose_branch_failure`; `npm run check` passed with 42 tests.
+- Review: separate reviewer found the package `bin` path was advertised but not executable through
+  `npm exec --workspace @pr-rosey/pr-watch -- pr-watch`; fixed by adding a Node shebang to the
+  package CLI. Reviewer also flagged the need for this current package-boundary progress receipt.
+- Remaining risk: no fresh live `gh` PR inspection was run for this architecture-only refactor;
+  behavior was verified by fixture parity, CLI smokes, tests, and code review.
+
 ## 2026-06-11 Babysit App Surface Receipt
 
 - Approved scope: user-reported follow-up that the app still only showed `Verify with Pi`, so the
@@ -36,8 +57,8 @@ into `docs/plans/completed/` when it matters later.
   references, and fixtures covering the required babysitting scenarios.
 - Files changed: `skills/pr-watch-skill/**`, `package.json`, `tsconfig.json`, `AGENTS.md`,
   `docs/README.md`, `docs/babysit-skill-goal.md`, and this progress note.
-- Verification: `npm test -- --run skills/pr-watch-skill/scripts/pr-watch.test.ts` passed with 16
-  tests; `npm run check` passed with 42 tests; live dogfood
+- Verification: the then-current skill-local scenario suite passed with 16 tests; `npm run check`
+  passed with 42 tests; live dogfood
   `npm run pr-watch -- 6 --repo tmwkdev/pr-rosey --pretty` captured PR #6, current head SHA
   `9085c72112a0903d3feeca17e96de978ebf85f4f`, the failed `Lint and typecheck` job URL, and selected
   `diagnose_branch_failure` without a GitHub mutation.

@@ -1,9 +1,13 @@
 {
   "name": "pr-rosey",
   "version": "0.1.0",
+  "private": true,
   "description": "Local-first Electron app for monitoring the current GitHub user's pull requests.",
   "main": "out/main/index.js",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -13,7 +17,7 @@
     "lint": "biome check .",
     "check": "npm run lint && npm run typecheck && npm test -- --run",
     "test": "vitest",
-    "pr-watch": "node skills/pr-watch-skill/scripts/pr-watch.ts"
+    "pr-watch": "node packages/pr-watch/src/cli.ts"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.78.1",

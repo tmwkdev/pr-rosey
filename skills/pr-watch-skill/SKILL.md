@@ -14,7 +14,7 @@ input is needed. It is local-first: use the authenticated `gh` CLI and local sta
 2. Run the TypeScript watcher:
 
    ```sh
-   node skills/pr-watch-skill/scripts/pr-watch.ts <pr-url-or-number> --pretty
+   npm run pr-watch -- <pr-url-or-number> --pretty
    ```
 
 3. Read the JSON report's `decision.action`, `reasons`, `feedback`, `failedChecks`, and
@@ -48,8 +48,8 @@ required.
 
 ## References
 
+- Watcher package: `packages/pr-watch/`
 - `references/ci-classification.md`
 - `references/review-feedback-policy.md`
 - `references/github-state-model.md`
 - `references/evaluation-scenarios.md`
-

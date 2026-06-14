@@ -1,6 +1,7 @@
 # Evaluation Scenarios
 
-Fixtures live in `scripts/fixtures/` and are tested by `scripts/pr-watch.test.ts`.
+Fixtures live in `packages/pr-watch/fixtures/` and are tested by
+`packages/pr-watch/src/pr-watch.test.ts`.
 
 | Fixture | Expected Action | Purpose |
 | --- | --- | --- |
@@ -18,6 +19,5 @@ Fixtures live in `scripts/fixtures/` and are tested by `scripts/pr-watch.test.ts
 Run the scenario suite with:
 
 ```sh
-npm test -- --run skills/pr-watch-skill/scripts/pr-watch.test.ts
+npm test -- --run packages/pr-watch/src/pr-watch.test.ts
 ```
-

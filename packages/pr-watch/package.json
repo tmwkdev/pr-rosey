@@ -1,0 +1,13 @@
+{
+  "name": "@pr-rosey/pr-watch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "pr-watch": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./cli": "./src/cli.ts"
+  }
+}

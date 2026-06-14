@@ -14,9 +14,10 @@ Human reviewer steps:
 2. Open this repo's implementation:
    - `skills/pr-watch-skill/SKILL.md`
    - `skills/pr-watch-skill/scripts/pr-watch.ts`
-   - `skills/pr-watch-skill/scripts/pr-watch.test.ts`
+   - `packages/pr-watch/src/*.ts`
+   - `packages/pr-watch/src/pr-watch.test.ts`
    - `skills/pr-watch-skill/references/*.md`
-   - `skills/pr-watch-skill/scripts/fixtures/*.json`
+   - `packages/pr-watch/fixtures/*.json`
 3. Confirm that similarities are limited to ordinary GitHub, CI, pull-request, and CLI concepts.
 4. Confirm the local implementation does not copy prose, comments, function names, data shapes,
    module boundaries, fixtures, test structure, or control flow from the reference.
@@ -34,7 +35,7 @@ Pass only if all statements are true:
 
 ## Engineering Evidence Already Collected
 
-- `npm test -- --run skills/pr-watch-skill/scripts/pr-watch.test.ts` passed with 16 tests.
+- `npm test -- --run packages/pr-watch/src/pr-watch.test.ts` passed with 16 tests.
 - `npm run check` passed with 42 tests.
 - Live dogfood `npm run pr-watch -- 6 --repo tmwkdev/pr-rosey --pretty` successfully inspected PR
   #6 and selected `diagnose_branch_failure` without mutating GitHub.
@@ -44,4 +45,3 @@ Pass only if all statements are true:
 ## Adoption Decision
 
 Do not mark the babysit scorecard complete until the human similarity review is recorded.
-

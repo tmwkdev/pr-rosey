@@ -14,12 +14,12 @@ import {
   type PullRequestSnapshot,
   readState,
   type WatchReport,
-} from "./pr-watch";
+} from "./index.ts";
 
 const execFileAsync = promisify(execFile);
 const here = dirname(fileURLToPath(import.meta.url));
-const fixtureDir = resolve(here, "fixtures");
-const scriptPath = resolve(here, "pr-watch.ts");
+const fixtureDir = resolve(here, "../fixtures");
+const scriptPath = resolve(here, "cli.ts");
 
 describe("pr-watch decision scenarios", () => {
   it.each([
