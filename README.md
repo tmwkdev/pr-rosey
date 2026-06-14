@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/brand/pr-rosey-logo-lockup.png" alt="pr-rosey" width="900" />
+  <img src="apps/desktop/assets/brand/pr-rosey-logo-lockup.png" alt="pr-rosey" width="900" />
 </p>
 
 pr-rosey
@@ -22,6 +22,11 @@ Install dependencies:
 ```sh
 npm install
 ```
+
+Workspace layout:
+
+- `apps/desktop/` - Electron desktop app
+- `packages/pr-watch/` - private PR babysitting helper package
 
 Run the app:
 
