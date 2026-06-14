@@ -12,7 +12,7 @@ dense desktop app where each component shape means one thing.
 Choose the most specific primitive that matches the job:
 
 1. Plain semantic HTML for structure and ordinary text.
-2. A token from `src/styles/tokens.ts` when a primitive only needs shared styling.
+2. A token from `apps/desktop/src/styles/tokens.ts` when a primitive only needs shared styling.
 3. A small local helper component when the parent becomes hard to scan or the region has a clear
    name.
 4. A feature component when there is meaningful local state, behavior, reuse, or a durable UI region.
@@ -124,9 +124,9 @@ Agents should treat component selection as a product decision, not a styling dec
 
 ## Styling And Tokens
 
-Reuse `src/styles/tokens.ts` before writing Tailwind classes on primitive elements. Add a token only
-when the same primitive class string repeats for the same purpose. Do not add a token for one-off
-styling, and do not create a token so broad that it hides the component's intent.
+Reuse `apps/desktop/src/styles/tokens.ts` before writing Tailwind classes on primitive elements. Add
+a token only when the same primitive class string repeats for the same purpose. Do not add a token
+for one-off styling, and do not create a token so broad that it hides the component's intent.
 
 If a repeated class string is really a semantic UI decision, name the token by purpose instead of
 shape. For example, prefer a status or metadata token over a generic `pill` token when the style is

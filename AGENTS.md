@@ -42,7 +42,7 @@ When building UI components, always follow these rules in priority order.
 
 ### Tokens First
 
-A file exists at `src/styles/tokens.ts` that defines base class strings for common elements
+A file exists at `apps/desktop/src/styles/tokens.ts` that defines base class strings for common elements
 including inputs, labels, buttons, cards, and form groups. Before writing any Tailwind class on a
 primitive HTML element, check if a token covers it. If it does, import and use it. Do not inline
 equivalent classes.
