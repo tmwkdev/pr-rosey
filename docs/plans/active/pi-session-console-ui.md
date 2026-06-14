@@ -44,7 +44,7 @@ available stop path.
 - Renderer Pi runner hook for selected session state and polling behavior.
 - Renderer pull-request screen and a new Pi session console feature component if that keeps ownership
   clearer.
-- `src/styles/tokens.ts` only for repeated primitive class strings.
+- `apps/desktop/src/styles/tokens.ts` only for repeated primitive class strings.
 - Tests for event normalization and renderer-safe session snapshot behavior.
 - Docs/progress handoff after implementation.
 
