@@ -1,9 +1,9 @@
 # pr-rosey Harness
 
 This harness keeps pr-rosey easy for agents to work on without turning process into the product.
-It borrows the useful part of the OpenAI harness structure: `AGENTS.md` is the map entry point,
-`docs/README.md` is the docs index, and durable knowledge lives in focused docs rather than one
-giant instruction file.
+It borrows the useful part of the OpenAI harness structure: root `AGENTS.md` is the repo policy and
+routing entry point, nested `AGENTS.md` files carry workspace-specific rules, `docs/README.md` is the
+docs index, and durable knowledge lives in focused docs rather than one giant instruction file.
 
 The default order is:
 
@@ -32,6 +32,8 @@ The default order is:
 Before changing code:
 
 - Read `AGENTS.md`.
+- Read the nearest nested `AGENTS.md` when changing files under a workspace such as `apps/desktop/`
+  or `packages/pr-watch/`.
 - Read `docs/README.md`.
 - Read any relevant active plan in `docs/plans/active/`.
 - Read the relevant repo-local skill under `skills/`; use `pr-rosey-implementer` for implementation
@@ -93,49 +95,22 @@ needed and bias agents toward thinking first, simplicity, surgical changes, and 
 
 Before calling product work complete, confirm:
 
-- Local system access stays in the Electron main process.
-- Preload exposes a minimal typed IPC boundary.
-- Renderer code owns React UI, visual state, and user interaction only.
-- Shared code contains types and pure helpers that are safe across the IPC boundary.
-- No hosted backend or unmanaged coding-agent execution was added.
+- The changed workspace still follows its nearest `AGENTS.md`.
+- No hosted backend, unmanaged coding-agent execution, or unapproved repository mutation was added.
+- Desktop work follows `apps/desktop/AGENTS.md`, including main/preload/shared/renderer ownership,
+  typed IPC, frontend token use, and renderer styling rules.
+- PR watch package work follows `packages/pr-watch/AGENTS.md`, including local-first reads,
+  fixture-testable policy, and no GitHub writes.
 - Managed coding-agent execution, when approved, runs only through main-process supervision in an
   approved workspace with visible state, durable logs, cancellation, and capability gates.
-- UI primitives reuse `apps/desktop/src/styles/tokens.ts` where a token exists.
-- Renderer styling and component choices follow `docs/frontend.md`.
 - A separate reviewer agent reviewed the completed chunk, or the lack of review is explicitly
   reported as a blocker.
 
 ## Source Layout
 
 Use Electron's process model as the first organizing rule, then use React feature boundaries inside
-the renderer as the app grows.
-
-- Keep `apps/desktop/src/main/index.ts` focused on Electron lifecycle, window creation, and handler
-  registration. Move local system access, GitHub CLI calls, and other Node/Electron work into small
-  main-process service modules under `apps/desktop/src/main/`.
-- Keep `apps/desktop/src/preload/index.ts` as the narrow bridge. Expose one typed method per IPC
-  operation and do not expose raw `ipcRenderer`, broad channel senders, Node modules, or
-  main-process services to the renderer.
-- Keep `apps/desktop/src/shared/` for serializable IPC contracts, domain types, and pure helpers
-  that are safe to import from main, preload, renderer, and tests. Shared files must not import from
-  `apps/desktop/src/main/`, `apps/desktop/src/preload/`, or `apps/desktop/src/renderer/`.
-- Keep `apps/desktop/src/renderer/main.tsx` as React bootstrapping only. Keep
-  `apps/desktop/src/renderer/App.tsx` as
-  composition for the current single-window experience until named regions, state, or reuse make a
-  split clearer.
-- When renderer code outgrows one file, prefer feature folders such as
-  `apps/desktop/src/renderer/features/pull-requests/` or
-  `apps/desktop/src/renderer/features/readiness/` that co-locate the feature's component, hooks,
-  helpers, and tests. Do not create broad `components/`, `hooks/`, or `utils/` folders before there
-  is real cross-feature reuse.
-- Put truly shared renderer UI in `apps/desktop/src/renderer/components/` only after at least two
-  features need the same behavior-rich component. Styling-only reuse belongs in
-  `apps/desktop/src/styles/tokens.ts`.
-- Keep global renderer CSS in `apps/desktop/src/renderer/styles.css`; keep shared Tailwind class
-  tokens in `apps/desktop/src/styles/tokens.ts`.
-- Co-locate tests with the module or feature they verify when that keeps ownership obvious. Use
-  `apps/desktop/src/shared/*.test.ts` for pure shared helpers and renderer-feature tests beside
-  their feature once renderer behavior needs tests.
+the renderer as the app grows. The executable desktop rules live in `apps/desktop/AGENTS.md`; the
+durable architecture summary lives in `docs/architecture.md`.
 
 ## File Boundaries
 
@@ -152,15 +127,14 @@ File boundaries should improve ownership and scanability; one component per file
   preserve ownership clarity and must not hide cross-boundary imports.
 - Do not split a cohesive module just to reduce line count, and do not merge unrelated concerns just
   because they are small.
-- Keep imports directional: `main`, `preload`, and `renderer` may import from `shared`; `renderer`
-  may import from `styles`; `shared` imports from no app layer; `renderer` never imports Electron,
-  Node system modules, `apps/desktop/src/main/`, or `apps/desktop/src/preload/`.
+- Keep workspace-specific import direction in the nearest `AGENTS.md` so the rule travels with the
+  app or package that owns it.
 
 ## Frontend Practices
 
-Use `docs/frontend.md` for renderer styling, component-selection, badge, status, tag, metadata,
-token, state, and frontend dependency guidance. Keep this harness focused on workflow, gates,
-ownership boundaries, and verification.
+Use `apps/desktop/AGENTS.md` for desktop frontend rules and `docs/frontend.md` for renderer styling,
+component-selection, badge, status, tag, metadata, token, state, and frontend dependency guidance.
+Keep this harness focused on workflow, gates, ownership boundaries, and verification.
 
 ## Managed Runner Readiness
 
@@ -168,6 +142,7 @@ pr-rosey is evolving toward managed PR runner workflows, but the harness remains
 single-work-item oriented. The foundation to preserve is:
 
 - A compact root `AGENTS.md` for hard policy and routing.
+- Nested workspace `AGENTS.md` files for app- and package-specific rules.
 - Focused docs for product boundaries, architecture, plans, progress, and the harness.
 - Small repo-local skills for implementer and reviewer roles.
 - Work items that name scope, non-goals, touched surfaces, acceptance criteria, validation, and
