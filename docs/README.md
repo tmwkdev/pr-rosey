@@ -5,6 +5,10 @@ the next agent or human who needs to make a product change.
 
 ## Map
 
+- `../AGENTS.md` - root repo policy, monorepo routing, workspace commands, and review expectations
+- `../apps/desktop/AGENTS.md` - desktop app architecture, IPC, renderer UI, and app-local checks
+- `../packages/pr-watch/AGENTS.md` - PR watch package boundary, CLI, fixtures, and package-local
+  checks
 - `harness.md` - how agents should work in this repo
 - `product.md` - product purpose, boundaries, and current product surface
 - `architecture.md` - Electron layer ownership and IPC boundaries

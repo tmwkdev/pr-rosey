@@ -4,6 +4,22 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-14 Monorepo Agent Guidance Receipt
+
+- Approved scope: user-requested cleanup after the npm workspaces migration so root agent guidance
+  stays repo-wide and app/package rules live beside their owning workspace.
+- Changed: refactored root `AGENTS.md` into monorepo policy and routing guidance; added
+  `apps/desktop/AGENTS.md` for Electron, IPC, renderer, frontend-token, and desktop verification
+  rules; added `packages/pr-watch/AGENTS.md` for package boundary, non-mutating GitHub behavior,
+  CLI, fixtures, and package tests; updated `docs/README.md` and `docs/harness.md` to route agents
+  to the scoped guidance files.
+- Safety preserved: documentation-only change; no product behavior, dependencies, hosted services,
+  OAuth, GitHub mutations, direct AI-agent execution, commits, pushes, merges, or runner capability
+  changes were added.
+- Verification: `npm run check` passed with 42 tests.
+- Review: separate reviewer found no findings and independently reran `npm run check`.
+- Remaining risk: no Electron manual verification was run because no Electron behavior changed.
+
 ## 2026-06-13 npm Workspaces Monorepo Receipt
 
 - Approved scope: user-requested step one of going all in on a monorepo shape with top-level
