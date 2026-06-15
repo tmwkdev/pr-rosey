@@ -4,6 +4,28 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-13 npm Workspaces Monorepo Receipt
+
+- Approved scope: user-requested step one of going all in on a monorepo shape with top-level
+  `apps/` and `packages/` directories using npm workspaces.
+- Changed: made the root package a workspace coordinator for `apps/*` and `packages/*`; moved the
+  Electron desktop app source, app configs, brand assets, and app package dependencies into
+  `apps/desktop/`; kept `packages/pr-watch/` as a private workspace package; added workspace-local
+  Vitest configs; and updated current layout guidance to point at
+  `apps/desktop/src/`.
+- Safety preserved: no product behavior, hosted backend, OAuth, GitHub mutations, direct
+  AI-agent execution, commits, pushes, merges, or new UI dependencies were added.
+- Verification: `npm install` completed and both workspaces are visible through `npm query
+  .workspace`; `npm run check` passed with 42 tests; `npm run build` passed and emitted the desktop
+  build under `apps/desktop/out`; root `npm run pr-watch` and workspace
+  `npm exec --workspace @pr-rosey/pr-watch -- pr-watch` fixture smokes both passed; `npm run dev`
+  launched Electron/Vite from the root script at `http://localhost:5173/`, and `curl -I` returned
+  HTTP 200 before shutdown.
+- Review: separate reviewer found no blocking issues and independently reran `npm run check`,
+  `npm run build`, both PR watch smokes, and a dev-server HTTP smoke.
+- Remaining risk: packaging/runtime behavior beyond the dev and build smoke was not manually
+  inspected in an Electron window.
+
 ## 2026-06-11 PR Watch Package Boundary Receipt
 
 - Approved scope: user-requested architecture treatment for `skills/pr-watch-skill/scripts/pr-watch.ts`
@@ -361,7 +383,7 @@ into `docs/plans/completed/` when it matters later.
   - `app-shell-readiness.md`
   - `github-actions-static-analysis.md`
   - `ci-status-rollup.md`
-- Source imports use the `@/` alias for app-local modules.
+- Source imports use the `@pr-rosey/desktop/` alias for app-local modules.
 - TypeScript uses `@typescript/native-preview` and `tsgo` for typechecking.
 
 ## Known Gaps And Risk

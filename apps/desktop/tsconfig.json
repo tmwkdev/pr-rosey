@@ -13,13 +13,13 @@
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "paths": {
-      "@pr-rosey/desktop/*": ["./apps/desktop/src/*"]
+      "@pr-rosey/desktop/*": ["./src/*"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vitest/globals", "node", "electron", "electron-vite/node"]
+    "types": ["vitest/globals"]
   },
-  "include": ["apps/**/*.ts", "apps/**/*.tsx", "skills/**/*.ts", "packages/**/*.ts"]
+  "include": ["src"]
 }

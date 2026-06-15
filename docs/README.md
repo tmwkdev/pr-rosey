@@ -17,6 +17,7 @@ the next agent or human who needs to make a product change.
 - `progress.md` - latest handoff state and verification notes
 - `plans/` - active and completed work items
 - `plan-template.md` - template for approved work items
+- `../apps/desktop/` - Electron desktop app workspace
 - `../packages/pr-watch/` - private PR watch package used by the PR babysitting skill
 - `../skills/` - repo-local implementer, reviewer, and PR watch skills for agent workflow
 
