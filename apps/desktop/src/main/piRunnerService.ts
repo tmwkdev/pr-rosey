@@ -104,7 +104,6 @@ const readOnlyPiToolNames = ["read", "grep", "find", "ls"] as const;
 const defaultWatchPollMilliseconds = 60_000;
 const staticAnalysisCheckNames = ["lint and typecheck", "static analysis"] as const;
 const staticAnalysisAutofixCommitMessage = "Fix static analysis failure";
-const staticAnalysisProbe: string = "42";
 
 function nowIso(options: PiRunnerServiceOptions): string {
   return options.now?.() ?? new Date().toISOString();
@@ -394,13 +393,22 @@ async function applyTs2322NumericStringFix(
     return null;
   }
 
-  const nextLine = previousLine.replace(/(:\s*string\s*=\s*)(\d+)(\s*;?\s*)$/, '$1"$2"$3');
+  const shouldRemoveProbeLine = /^\s*const\s+\w*probe\w*\s*:\s*string\s*=\s*\d+\s*;?\s*$/i.test(
+    previousLine,
+  );
+  const nextLine = shouldRemoveProbeLine
+    ? ""
+    : previousLine.replace(/(:\s*string\s*=\s*)(\d+)(\s*;?\s*)$/, '$1"$2"$3');
 
-  if (nextLine === previousLine) {
+  if (!shouldRemoveProbeLine && nextLine === previousLine) {
     return null;
   }
 
-  lines[fix.lineIndex] = nextLine;
+  if (shouldRemoveProbeLine) {
+    lines.splice(fix.lineIndex, 1);
+  } else {
+    lines[fix.lineIndex] = nextLine;
+  }
   await writeFile(fix.absolutePath, lines.join("\n"), "utf8");
 
   return {

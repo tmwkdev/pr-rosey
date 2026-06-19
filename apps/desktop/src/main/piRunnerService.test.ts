@@ -518,9 +518,7 @@ describe("pi runner service", () => {
       expect(runCommandCalls).toContain(`git -C ${repositoryRootPath} push origin feature`);
     });
 
-    await expect(readFile(sourceFilePath, "utf8")).resolves.toContain(
-      'const staticAnalysisProbe: string = "42";',
-    );
+    await expect(readFile(sourceFilePath, "utf8")).resolves.not.toContain("staticAnalysisProbe");
     expect(agentSessionCalls).toHaveLength(0);
     expect(runCommandCalls).toEqual(
       expect.arrayContaining([
