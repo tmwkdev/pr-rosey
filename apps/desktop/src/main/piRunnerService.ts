@@ -21,6 +21,13 @@ import {
   type RepositoryMapping,
   repositoryMappingKey,
 } from "@pr-rosey/desktop/shared/repositoryMappings";
+import {
+  type CliOptions,
+  DEFAULT_RETRY_LIMIT,
+  evaluateOnce,
+  type WatchAction,
+  type WatchReport,
+} from "@pr-rosey/pr-watch";
 
 type PiAgentMessage = {
   content?: unknown;
@@ -63,12 +70,23 @@ type CreatePiAgentSession = (input: {
 
 type PiRunnerRuntime = {
   agentSession: PiAgentSession;
+  promptedWatchKeys: Set<string>;
+  promptQueue: Promise<void>;
+  watchAbortController: AbortController;
   unsubscribe: () => void;
 };
+
+type EvaluateWatchOnce = (options: CliOptions) => Promise<WatchReport>;
+
+type Sleep = (milliseconds: number, signal: AbortSignal) => Promise<void>;
 
 export type PiRunnerServiceOptions = RepositoryMappingServiceOptions & {
   createId?: () => string;
   createAgentSession?: CreatePiAgentSession;
+  evaluateWatchOnce?: EvaluateWatchOnce;
+  maxWatchIterations?: number;
+  sleep?: Sleep;
+  watchPollMilliseconds?: number;
 };
 
 const sessions = new Map<string, PiRunnerSessionSnapshot>();
@@ -76,6 +94,7 @@ const runtimes = new Map<string, PiRunnerRuntime>();
 const maxVisibleActivityEvents = 80;
 const maxVisibleOutputLines = 40;
 const readOnlyPiToolNames = ["read", "grep", "find", "ls"] as const;
+const defaultWatchPollMilliseconds = 60_000;
 
 function nowIso(options: PiRunnerServiceOptions): string {
   return options.now?.() ?? new Date().toISOString();
@@ -91,6 +110,29 @@ function getLogFilePath(userDataPath: string, sessionId: string): string {
 
 function getPiSessionDir(userDataPath: string, sessionId: string): string {
   return path.join(userDataPath, "pi-agent-sessions", sessionId);
+}
+
+function getWatchStateFilePath(userDataPath: string, sessionId: string): string {
+  return path.join(userDataPath, "pr-watch-sessions", `${sessionId}-state.json`);
+}
+
+function sleepWithAbort(milliseconds: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolveSleep) => {
+    const timeoutId = setTimeout(resolveSleep, milliseconds);
+
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timeoutId);
+        resolveSleep();
+      },
+      { once: true },
+    );
+  });
 }
 
 function isActiveSession(session: PiRunnerSessionSnapshot): boolean {
@@ -143,13 +185,132 @@ async function recordSessionActivity(
   await appendFile(session.logFilePath, `${JSON.stringify({ activity: event })}\n`, "utf8");
 }
 
-function recordSessionLineAsync(
-  options: PiRunnerServiceOptions,
+async function finishSession(
   session: PiRunnerSessionSnapshot,
-  stream: PiRunnerLogStream,
+  status: Extract<PiRunnerSessionSnapshot["status"], "exited" | "failed" | "aborted">,
+  timestamp: string,
+  exitCode: number,
   message: string,
-): void {
-  void recordSessionLine(session, stream, message, nowIso(options)).catch(() => undefined);
+  error: string | null = null,
+): Promise<void> {
+  if (!isActiveSession(session)) {
+    return;
+  }
+
+  const runtime = runtimes.get(session.id);
+  runtime?.watchAbortController.abort();
+  runtime?.unsubscribe();
+  runtime?.agentSession.dispose();
+  runtimes.delete(session.id);
+
+  session.status = status;
+  session.exitedAt = timestamp;
+  session.exitCode = exitCode;
+  session.error = error;
+  session.updatedAt = timestamp;
+
+  await recordSessionLine(session, status === "failed" ? "stderr" : "system", message, timestamp);
+}
+
+function describeWatchReport(report: WatchReport): string {
+  const parts = [
+    report.decision.summary,
+    `SHA ${report.decision.currentSha.slice(0, 12)}`,
+    `${report.decision.pendingChecks.length} pending`,
+    `${report.decision.failedChecks.length} failed`,
+    `${report.decision.feedback.length} feedback`,
+  ];
+
+  return parts.join(" / ");
+}
+
+function createWatchDecisionEvent(report: WatchReport, timestamp: string): PiRunnerActivityEvent {
+  const needsUser =
+    report.decision.needsUser || watchActionRequiresUserApproval(report.decision.action);
+  const status: PiRunnerActivityEvent["status"] = report.decision.terminal
+    ? "success"
+    : needsUser
+      ? "failed"
+      : "info";
+
+  return {
+    timestamp,
+    kind: needsUser ? "important-output" : "system",
+    status,
+    title: `PR watch: ${report.decision.action}`,
+    summary: describeWatchReport(report),
+    detail: createWatchReportDetail(report),
+    stream: "system",
+  };
+}
+
+function createWatchReportDetail(report: WatchReport): string | null {
+  const lines = [
+    `PR: ${report.snapshot.pr.url}`,
+    `Lifecycle: ${report.snapshot.pr.lifecycle}`,
+    `Merge state: ${report.snapshot.pr.mergeable} / ${report.snapshot.pr.mergeState}`,
+    `Review decision: ${report.snapshot.pr.reviewDecision || "none"}`,
+  ];
+
+  for (const check of report.decision.failedChecks.slice(0, 5)) {
+    lines.push(`Failed: ${check.name}${check.url ? ` (${check.url})` : ""}`);
+  }
+
+  for (const check of report.decision.pendingChecks.slice(0, 5)) {
+    lines.push(`Pending: ${check.name}${check.url ? ` (${check.url})` : ""}`);
+  }
+
+  for (const item of report.decision.feedback.slice(0, 5)) {
+    lines.push(`Feedback from @${item.author}: ${item.url ?? item.id}`);
+  }
+
+  return lines.join("\n");
+}
+
+function watchActionRequiresUserApproval(action: WatchAction): boolean {
+  return action === "recommend_rerun" || action === "ask_user";
+}
+
+function shouldAskPiForReadOnlyDiagnosis(action: WatchAction): boolean {
+  return action === "surface_failed_job" || action === "diagnose_branch_failure";
+}
+
+function getWatchDiagnosisPromptKey(report: WatchReport): string {
+  const failedCheckNames = report.decision.failedChecks
+    .map((check) => check.name)
+    .sort()
+    .join(",");
+
+  return [report.decision.action, report.decision.currentSha, failedCheckNames].join(":");
+}
+
+function createPiWatchUpdatePrompt(report: WatchReport, localPath: string): string {
+  const failedChecks = report.decision.failedChecks.map((check) =>
+    [check.name, check.workflow, check.url, check.summary].filter(Boolean).join(" / "),
+  );
+  const pendingChecks = report.decision.pendingChecks.map((check) => check.name);
+  const feedback = report.decision.feedback.map((item) =>
+    [item.kind, `@${item.author}`, item.url, item.body.slice(0, 500)].filter(Boolean).join(" / "),
+  );
+
+  return [
+    "PR-WATCH UPDATE",
+    `Repository: ${report.snapshot.repository ?? report.target.repository ?? "unknown"}`,
+    `Pull request: #${report.snapshot.pr.number} ${report.snapshot.pr.title}`,
+    `URL: ${report.snapshot.pr.url}`,
+    `Decision: ${report.decision.action}`,
+    `Summary: ${report.decision.summary}`,
+    `Reasons: ${report.decision.reasons.join(", ") || "none"}`,
+    `Head SHA: ${report.decision.currentSha}`,
+    `Merge state: ${report.snapshot.pr.mergeable} / ${report.snapshot.pr.mergeState}`,
+    `Review decision: ${report.snapshot.pr.reviewDecision || "none"}`,
+    `Working directory: ${localPath}`,
+    `Failed checks: ${failedChecks.length > 0 ? failedChecks.join("\n- ") : "none"}`,
+    `Pending checks: ${pendingChecks.length > 0 ? pendingChecks.join(", ") : "none"}`,
+    `Feedback: ${feedback.length > 0 ? feedback.join("\n- ") : "none"}`,
+    "Use read-only tools only. Do not run shell commands, edit files, commit, push, merge, comment on GitHub, resolve review threads, or rerun CI.",
+    "Return BABYSIT REPORT with the evidence inspected, likely cause or readiness state, and the next safe user-visible action.",
+  ].join("\n");
 }
 
 function findMappingForPullRequest(
@@ -458,6 +619,176 @@ export function createPiBabysitPrompt(pullRequest: PullRequestSummary, localPath
 
 export const createPiRepositoryVerificationPrompt = createPiBabysitPrompt;
 
+async function queuePiPrompt(
+  options: PiRunnerServiceOptions,
+  session: PiRunnerSessionSnapshot,
+  prompt: string,
+  logMessage: string,
+): Promise<void> {
+  const runtime = runtimes.get(session.id);
+
+  if (!runtime || !isActiveSession(session)) {
+    return;
+  }
+
+  const timestamp = nowIso(options);
+  await recordSessionLine(session, "system", logMessage, timestamp);
+  session.conversation = [
+    ...session.conversation,
+    {
+      id: `${session.id}-prompt-${session.conversation.length + 1}`,
+      role: "user",
+      status: "pending",
+      title: "Prompt",
+      body: prompt,
+      timestamp,
+    },
+  ];
+
+  runtime.promptQueue = runtime.promptQueue
+    .catch(() => undefined)
+    .then(async () => {
+      if (!runtime.watchAbortController.signal.aborted && isActiveSession(session)) {
+        await runtime.agentSession.prompt(prompt);
+      }
+    })
+    .catch((error: unknown) => {
+      const failedAt = nowIso(options);
+      const message = error instanceof Error ? error.message : "Pi AgentSession failed.";
+      void finishSession(
+        session,
+        session.status === "aborting" ? "aborted" : "failed",
+        failedAt,
+        session.status === "aborting" ? 0 : 1,
+        `Pi AgentSession failed: ${message}`,
+        session.status === "aborting" ? null : message,
+      ).catch(() => undefined);
+    });
+
+  await Promise.resolve();
+}
+
+function createWatchEvaluator(options: PiRunnerServiceOptions): EvaluateWatchOnce {
+  return options.evaluateWatchOnce ?? evaluateOnce;
+}
+
+async function runBabysitWatchLoop(
+  options: PiRunnerServiceOptions,
+  session: PiRunnerSessionSnapshot,
+  pullRequest: PullRequestSummary,
+): Promise<void> {
+  const runtime = runtimes.get(session.id);
+
+  if (!runtime) {
+    return;
+  }
+
+  const evaluateWatch = createWatchEvaluator(options);
+  const sleep = options.sleep ?? sleepWithAbort;
+  const pollMilliseconds = options.watchPollMilliseconds ?? defaultWatchPollMilliseconds;
+  const maxIterations = options.maxWatchIterations ?? Number.POSITIVE_INFINITY;
+  const stateFile = getWatchStateFilePath(options.userDataPath, session.id);
+
+  await recordSessionActivity(session, {
+    timestamp: nowIso(options),
+    kind: "system",
+    status: "info",
+    title: "PR watch started",
+    summary: `Watching ${pullRequest.repository.nameWithOwner}#${pullRequest.number} every ${Math.round(
+      pollMilliseconds / 1000,
+    )} seconds.`,
+    detail: `State file: ${stateFile}`,
+    stream: "system",
+  });
+
+  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    if (runtime.watchAbortController.signal.aborted || !isActiveSession(session)) {
+      return;
+    }
+
+    let report: WatchReport;
+
+    try {
+      report = await evaluateWatch({
+        selector: pullRequest.url,
+        repository: pullRequest.repository.nameWithOwner,
+        stateFile,
+        pretty: false,
+        noLock: true,
+        retryLimit: DEFAULT_RETRY_LIMIT,
+        maxIterations: 1,
+      });
+    } catch (error) {
+      const failedAt = nowIso(options);
+      const message = error instanceof Error ? error.message : "Could not evaluate PR watch state.";
+      await finishSession(session, "failed", failedAt, 1, `PR watch failed: ${message}`, message);
+      return;
+    }
+
+    await recordSessionActivity(session, createWatchDecisionEvent(report, nowIso(options)));
+
+    if (report.decision.terminal) {
+      await finishSession(
+        session,
+        "exited",
+        nowIso(options),
+        0,
+        `PR watch stopped: ${report.decision.summary}`,
+      );
+      return;
+    }
+
+    if (report.decision.needsUser || watchActionRequiresUserApproval(report.decision.action)) {
+      await finishSession(
+        session,
+        "exited",
+        nowIso(options),
+        0,
+        `PR watch needs user input: ${report.decision.summary}`,
+      );
+      return;
+    }
+
+    if (shouldAskPiForReadOnlyDiagnosis(report.decision.action)) {
+      const diagnosisPromptKey = getWatchDiagnosisPromptKey(report);
+      if (runtime.promptedWatchKeys.has(diagnosisPromptKey)) {
+        await recordSessionActivity(session, {
+          timestamp: nowIso(options),
+          kind: "system",
+          status: "info",
+          title: "PR watch diagnosis already queued",
+          summary: "The same current-SHA failure was already sent to Pi for read-only diagnosis.",
+          detail: null,
+          stream: "system",
+        });
+      } else {
+        runtime.promptedWatchKeys.add(diagnosisPromptKey);
+        await queuePiPrompt(
+          options,
+          session,
+          createPiWatchUpdatePrompt(report, session.localPath),
+          `Sent PR-watch follow-up prompt for ${report.decision.action}.`,
+        );
+      }
+    }
+
+    if (iteration + 1 >= maxIterations) {
+      await recordSessionActivity(session, {
+        timestamp: nowIso(options),
+        kind: "system",
+        status: "info",
+        title: "PR watch paused",
+        summary: `Stopped after ${maxIterations} watch iteration${maxIterations === 1 ? "" : "s"}.`,
+        detail: null,
+        stream: "system",
+      });
+      return;
+    }
+
+    await sleep(pollMilliseconds, runtime.watchAbortController.signal);
+  }
+}
+
 export function listPiRunnerSessions(): PiRunnerSessionSnapshot[] {
   return [...sessions.values()]
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
@@ -466,6 +797,7 @@ export function listPiRunnerSessions(): PiRunnerSessionSnapshot[] {
 
 export function resetPiRunnerSessionsForTests(): void {
   for (const runtime of runtimes.values()) {
+    runtime.watchAbortController.abort();
     runtime.unsubscribe();
     runtime.agentSession.dispose();
   }
@@ -578,6 +910,7 @@ export async function startPiRepositoryVerification(
     nowIso(options),
   );
 
+  const watchAbortController = new AbortController();
   const unsubscribe = agentSession.subscribe((event) => {
     const timestamp = nowIso(options);
     session.updatedAt = timestamp;
@@ -605,47 +938,45 @@ export async function startPiRepositoryVerification(
         return;
       }
 
-      session.status = session.status === "aborting" ? "aborted" : "exited";
-      session.exitCode = 0;
-      session.exitedAt = timestamp;
-      runtimes.delete(session.id);
-      unsubscribe();
-      agentSession.dispose();
+      if (session.status === "aborting") {
+        void finishSession(
+          session,
+          "aborted",
+          timestamp,
+          0,
+          "Pi AgentSession stopped after abort.",
+        ).catch(() => undefined);
+      }
     }
   });
 
-  runtimes.set(session.id, { agentSession, unsubscribe });
+  runtimes.set(session.id, {
+    agentSession,
+    promptedWatchKeys: new Set(),
+    promptQueue: Promise.resolve(),
+    watchAbortController,
+    unsubscribe,
+  });
 
-  await recordSessionLine(
-    session,
-    "system",
-    `Sent read-only babysit prompt for ${pullRequest.repository.nameWithOwner}#${pullRequest.number}.`,
-    nowIso(options),
-  );
   const prompt = createPiBabysitPrompt(pullRequest, inspection.localPath);
-  session.conversation = [
-    ...session.conversation,
-    {
-      id: `${session.id}-prompt`,
-      role: "user",
-      status: "pending",
-      title: "Prompt",
-      body: prompt,
-      timestamp: session.updatedAt,
-    },
-  ];
+  await queuePiPrompt(
+    options,
+    session,
+    prompt,
+    `Sent read-only babysit prompt for ${pullRequest.repository.nameWithOwner}#${pullRequest.number}.`,
+  );
 
-  void agentSession.prompt(prompt).catch((error: unknown) => {
+  void runBabysitWatchLoop(options, session, pullRequest).catch((error: unknown) => {
     const timestamp = nowIso(options);
-    session.status = session.status === "aborting" ? "aborted" : "failed";
-    session.error = error instanceof Error ? error.message : "Pi AgentSession failed.";
-    session.exitedAt = timestamp;
-    session.exitCode = session.status === "aborted" ? 0 : 1;
-    session.updatedAt = timestamp;
-    runtimes.delete(session.id);
-    unsubscribe();
-    agentSession.dispose();
-    recordSessionLineAsync(options, session, "system", `Pi AgentSession failed: ${session.error}`);
+    const message = error instanceof Error ? error.message : "PR watch loop failed.";
+    void finishSession(
+      session,
+      "failed",
+      timestamp,
+      1,
+      `PR watch loop failed: ${message}`,
+      message,
+    );
   });
 
   return snapshotSession(session);
@@ -670,6 +1001,7 @@ export async function abortPiRunnerSession(
   session.status = "aborting";
   session.updatedAt = nowIso(options);
   await recordSessionLine(session, "system", "Abort requested by user.", session.updatedAt);
+  runtime.watchAbortController.abort();
   await runtime.agentSession.abort();
 
   return snapshotSession(session);

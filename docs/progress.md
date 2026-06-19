@@ -4,6 +4,33 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-15 Autonomous Babysit Loop Receipt
+
+- Approved scope: user-requested follow-up to make the PR row `Babysit` action work more
+  autonomously, using the upstream babysit-pr behavior as the target shape: keep watching while safe,
+  escalate only when human input or disallowed mutation is needed, and do not stop just because CI is
+  green.
+- Changed: desktop Pi runner sessions now start a main-process PR-watch polling loop for the
+  selected PR URL; each watch decision is recorded into the visible session timeline/log; branch
+  failure decisions send Pi a read-only `PR-WATCH UPDATE` follow-up prompt once per unchanged
+  action/SHA/check set; pending/green/open PRs keep watching; terminal closed/merged PRs stop; human
+  feedback, unknown/unsafe failures, and CI rerun recommendations stop with user-visible escalation.
+  Abort now cancels both Pi and the watch loop.
+- Files changed: `apps/desktop/src/main/piRunnerService.ts`,
+  `apps/desktop/src/main/piRunnerService.test.ts`, desktop/root TypeScript config path wiring,
+  `apps/desktop/package.json`, `package-lock.json`, and this progress note.
+- Safety preserved: no hosted backend, OAuth, automatic commits, pushes, merges, GitHub comments,
+  review-thread resolution, or CI reruns were added. Pi remains constrained to read-only tools.
+- Verification: targeted desktop Pi runner tests passed; `npm run check` passed with 46 tests;
+  `npm run build --workspace @pr-rosey/desktop` passed; `npm run dev` launched Electron/Vite at
+  `http://localhost:5173/`, and `curl -I` returned HTTP 200. Built main output contains the new
+  `PR watch` and `PR-WATCH UPDATE` behavior strings.
+- Review: separate reviewer found no findings and independently reran the focused Pi runner tests,
+  `npm run check`, and the desktop build.
+- Remaining risk: the in-app Browser connector still reports `Browser is not available: iab`, so no
+  screenshot/DOM visual inspection was captured. No live GitHub/Pi babysit run was executed in this
+  session; loop behavior was verified with deterministic service tests.
+
 ## 2026-06-14 Monorepo Agent Guidance Receipt
 
 - Approved scope: user-requested cleanup after the npm workspaces migration so root agent guidance

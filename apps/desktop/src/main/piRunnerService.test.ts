@@ -11,7 +11,8 @@ import {
 import { saveRepositoryMapping } from "@pr-rosey/desktop/main/repositoryMappingService";
 import type { ShellCommandResult } from "@pr-rosey/desktop/main/shellCommand";
 import type { PullRequestSummary } from "@pr-rosey/desktop/shared/pullRequests";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { CliOptions, WatchAction, WatchReport } from "@pr-rosey/pr-watch";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type FakeAgentSessionEvent = {
   args?: unknown;
@@ -78,6 +79,8 @@ type AgentSessionCall = {
   sessionDir: string;
   tools: readonly string[];
 };
+
+type WatchCall = CliOptions;
 
 let userDataPath: string;
 
@@ -148,6 +151,122 @@ function createPullRequestSummary(): PullRequestSummary {
   };
 }
 
+function createWatchReport(
+  action: WatchAction = "ready_keep_watching",
+  overrides: Partial<WatchReport["decision"]> = {},
+): WatchReport {
+  const needsUser = action === "ask_user" || action === "report_human_feedback";
+  const terminal = action === "stop_terminal";
+  const failedChecks =
+    action === "diagnose_branch_failure" || action === "surface_failed_job"
+      ? [
+          {
+            name: "Lint and typecheck",
+            result: "fail" as const,
+            workflow: "CI",
+            url: "https://github.com/owner/repo/actions/runs/1/job/2",
+            headSha: "abc123",
+            failureCause: "branch" as const,
+            summary: "tsgo failed",
+          },
+        ]
+      : [];
+
+  return {
+    schemaVersion: "pr-watch-report/v1",
+    generatedAt: "2026-06-06T12:00:00.000Z",
+    target: {
+      selector: "https://github.com/owner/repo/pull/12",
+      repository: "owner/repo",
+      stateFile: path.join(userDataPath, "state.json"),
+    },
+    snapshot: {
+      schemaVersion: "pr-watch-snapshot/v1",
+      collectedAt: "2026-06-06T12:00:00.000Z",
+      repository: "owner/repo",
+      pr: {
+        number: 12,
+        url: "https://github.com/owner/repo/pull/12",
+        title: "Test pull request",
+        lifecycle: terminal ? "merged" : "open",
+        headBranch: "feature",
+        baseBranch: "main",
+        headSha: "abc123",
+        mergeable: "MERGEABLE",
+        mergeState: "CLEAN",
+        reviewDecision: "",
+        isDraft: false,
+      },
+      ci: {
+        currentSha: "abc123",
+        checks: failedChecks,
+      },
+      feedback: {
+        items:
+          action === "report_human_feedback"
+            ? [
+                {
+                  id: "review-comment:1",
+                  kind: "review_comment",
+                  author: "reviewer",
+                  body: "Please update this before merge.",
+                  submittedAt: "2026-06-06T12:00:00.000Z",
+                  url: "https://github.com/owner/repo/pull/12#discussion_r1",
+                  actionable: true,
+                },
+              ]
+            : [],
+      },
+    },
+    decision: {
+      action,
+      summary:
+        action === "ready_keep_watching"
+          ? "The pull request looks ready, but it is still open; keep watching."
+          : `${action} summary`,
+      terminal,
+      needsUser,
+      currentSha: "abc123",
+      reasons: [action],
+      feedback:
+        action === "report_human_feedback"
+          ? [
+              {
+                id: "review-comment:1",
+                kind: "review_comment",
+                author: "reviewer",
+                body: "Please update this before merge.",
+                submittedAt: "2026-06-06T12:00:00.000Z",
+                url: "https://github.com/owner/repo/pull/12#discussion_r1",
+                actionable: true,
+              },
+            ]
+          : [],
+      failedChecks,
+      pendingChecks: action === "watch_wait" ? [{ name: "CI", result: "pending" }] : [],
+      retry: {
+        used: 0,
+        limit: 2,
+        remaining: 2,
+      },
+      ...overrides,
+    },
+  };
+}
+
+function createWatchOptions(report = createWatchReport()) {
+  const calls: WatchCall[] = [];
+  return {
+    calls,
+    evaluateWatchOnce: async (options: CliOptions) => {
+      calls.push(options);
+      return report;
+    },
+    sleep: () => new Promise<void>(() => undefined),
+    watchPollMilliseconds: 5,
+  };
+}
+
 function createTestAgentSessionFactory(calls: AgentSessionCall[]) {
   return async (input: { cwd: string; sessionDir: string; tools: readonly string[] }) => {
     const session = new FakeAgentSession();
@@ -187,6 +306,7 @@ describe("pi runner service", () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
+    const watchOptions = createWatchOptions();
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -199,7 +319,10 @@ describe("pi runner service", () => {
         runCommand,
         createId: () => "session-1",
         createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        evaluateWatchOnce: watchOptions.evaluateWatchOnce,
         now: () => "2026-06-06T12:00:00.000Z",
+        sleep: watchOptions.sleep,
+        watchPollMilliseconds: watchOptions.watchPollMilliseconds,
       },
       createPullRequestSummary(),
     );
@@ -234,10 +357,193 @@ describe("pi runner service", () => {
     expect(logFile).toContain("Sent read-only babysit prompt");
   });
 
+  it("starts an autonomous PR watch loop for the selected pull request", async () => {
+    const repositoryRootPath = path.join(userDataPath, "repo");
+    const runCommand = createTestRunCommand(repositoryRootPath);
+    const agentSessionCalls: AgentSessionCall[] = [];
+    const watchOptions = createWatchOptions(createWatchReport("watch_wait"));
+
+    await saveRepositoryMapping(
+      { userDataPath, runCommand },
+      { repositoryNameWithOwner: "owner/repo", localPath: repositoryRootPath },
+    );
+
+    await startPiRepositoryVerification(
+      {
+        userDataPath,
+        runCommand,
+        createId: () => "session-watch",
+        createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        evaluateWatchOnce: watchOptions.evaluateWatchOnce,
+        now: () => "2026-06-06T12:00:00.000Z",
+        sleep: watchOptions.sleep,
+        watchPollMilliseconds: watchOptions.watchPollMilliseconds,
+      },
+      createPullRequestSummary(),
+    );
+
+    await vi.waitFor(() => {
+      expect(watchOptions.calls).toHaveLength(1);
+    });
+
+    expect(watchOptions.calls[0]).toMatchObject({
+      selector: "https://github.com/owner/repo/pull/12",
+      repository: "owner/repo",
+      noLock: true,
+      retryLimit: 2,
+      maxIterations: 1,
+    });
+    expect(watchOptions.calls[0].stateFile).toContain("pr-watch-sessions/session-watch-state.json");
+
+    const runningSession = listPiRunnerSessions()[0];
+    expect(runningSession.status).toBe("running");
+    expect(runningSession.activityEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "PR watch started",
+        }),
+        expect.objectContaining({
+          title: "PR watch: watch_wait",
+          summary: expect.stringContaining("watch_wait summary"),
+        }),
+      ]),
+    );
+  });
+
+  it("asks Pi for read-only diagnosis when PR watch finds a branch failure", async () => {
+    const repositoryRootPath = path.join(userDataPath, "repo");
+    const runCommand = createTestRunCommand(repositoryRootPath);
+    const agentSessionCalls: AgentSessionCall[] = [];
+    const watchOptions = createWatchOptions(createWatchReport("diagnose_branch_failure"));
+
+    await saveRepositoryMapping(
+      { userDataPath, runCommand },
+      { repositoryNameWithOwner: "owner/repo", localPath: repositoryRootPath },
+    );
+
+    await startPiRepositoryVerification(
+      {
+        userDataPath,
+        runCommand,
+        createId: () => "session-diagnose",
+        createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        evaluateWatchOnce: watchOptions.evaluateWatchOnce,
+        now: () => "2026-06-06T12:00:00.000Z",
+        sleep: watchOptions.sleep,
+        watchPollMilliseconds: watchOptions.watchPollMilliseconds,
+      },
+      createPullRequestSummary(),
+    );
+
+    await vi.waitFor(() => {
+      expect(agentSessionCalls[0].session.prompts).toHaveLength(2);
+    });
+
+    expect(agentSessionCalls[0].session.prompts[1]).toContain("PR-WATCH UPDATE");
+    expect(agentSessionCalls[0].session.prompts[1]).toContain("Decision: diagnose_branch_failure");
+    expect(agentSessionCalls[0].session.prompts[1]).toContain("Lint and typecheck");
+    expect(agentSessionCalls[0].session.prompts[1]).toContain("Use read-only tools only");
+    expect(listPiRunnerSessions()[0]).toMatchObject({
+      id: "session-diagnose",
+      status: "running",
+    });
+  });
+
+  it("does not send duplicate read-only diagnosis prompts for the same failure", async () => {
+    const repositoryRootPath = path.join(userDataPath, "repo");
+    const runCommand = createTestRunCommand(repositoryRootPath);
+    const agentSessionCalls: AgentSessionCall[] = [];
+    const report = createWatchReport("diagnose_branch_failure");
+    const watchCalls: CliOptions[] = [];
+
+    await saveRepositoryMapping(
+      { userDataPath, runCommand },
+      { repositoryNameWithOwner: "owner/repo", localPath: repositoryRootPath },
+    );
+
+    await startPiRepositoryVerification(
+      {
+        userDataPath,
+        runCommand,
+        createId: () => "session-deduped-diagnosis",
+        createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        evaluateWatchOnce: async (options) => {
+          watchCalls.push(options);
+          return report;
+        },
+        maxWatchIterations: 2,
+        now: () => "2026-06-06T12:00:00.000Z",
+        sleep: async () => undefined,
+        watchPollMilliseconds: 5,
+      },
+      createPullRequestSummary(),
+    );
+
+    await vi.waitFor(() => {
+      expect(watchCalls).toHaveLength(2);
+    });
+
+    expect(agentSessionCalls[0].session.prompts).toHaveLength(2);
+    expect(agentSessionCalls[0].session.prompts[1]).toContain("PR-WATCH UPDATE");
+    expect(listPiRunnerSessions()[0].activityEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "PR watch diagnosis already queued",
+        }),
+      ]),
+    );
+  });
+
+  it("stops and surfaces escalation when PR watch needs user input", async () => {
+    const repositoryRootPath = path.join(userDataPath, "repo");
+    const runCommand = createTestRunCommand(repositoryRootPath);
+    const agentSessionCalls: AgentSessionCall[] = [];
+    const watchOptions = createWatchOptions(createWatchReport("report_human_feedback"));
+
+    await saveRepositoryMapping(
+      { userDataPath, runCommand },
+      { repositoryNameWithOwner: "owner/repo", localPath: repositoryRootPath },
+    );
+
+    await startPiRepositoryVerification(
+      {
+        userDataPath,
+        runCommand,
+        createId: () => "session-feedback",
+        createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        evaluateWatchOnce: watchOptions.evaluateWatchOnce,
+        now: () => "2026-06-06T12:00:00.000Z",
+        sleep: watchOptions.sleep,
+        watchPollMilliseconds: watchOptions.watchPollMilliseconds,
+      },
+      createPullRequestSummary(),
+    );
+
+    await vi.waitFor(() => {
+      expect(listPiRunnerSessions()[0].status).toBe("exited");
+    });
+
+    const stoppedSession = listPiRunnerSessions()[0];
+    expect(agentSessionCalls[0].session.disposed).toBe(true);
+    expect(stoppedSession.activityEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "important-output",
+          title: "PR watch: report_human_feedback",
+          status: "failed",
+        }),
+      ]),
+    );
+    expect(stoppedSession.outputLines.map((line) => line.message)).toContain(
+      "PR watch needs user input: report_human_feedback summary",
+    );
+  });
+
   it("records structured AgentSession events and aborts an active Pi session", async () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
+    const watchOptions = createWatchOptions();
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -250,7 +556,10 @@ describe("pi runner service", () => {
         runCommand,
         createId: () => "session-2",
         createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        evaluateWatchOnce: watchOptions.evaluateWatchOnce,
         now: () => "2026-06-06T12:00:00.000Z",
+        sleep: watchOptions.sleep,
+        watchPollMilliseconds: watchOptions.watchPollMilliseconds,
       },
       createPullRequestSummary(),
     );
@@ -335,6 +644,8 @@ describe("pi runner service", () => {
           runCommand,
           createId: () => "session-3",
           createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+          evaluateWatchOnce: watchOptions.evaluateWatchOnce,
+          sleep: watchOptions.sleep,
         },
         createPullRequestSummary(),
       ),
@@ -345,6 +656,7 @@ describe("pi runner service", () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
+    const watchOptions = createWatchOptions();
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -357,7 +669,10 @@ describe("pi runner service", () => {
         runCommand,
         createId: () => "session-tool-only",
         createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        evaluateWatchOnce: watchOptions.evaluateWatchOnce,
         now: () => "2026-06-06T12:00:00.000Z",
+        sleep: watchOptions.sleep,
+        watchPollMilliseconds: watchOptions.watchPollMilliseconds,
       },
       createPullRequestSummary(),
     );
@@ -440,6 +755,7 @@ describe("pi runner service", () => {
     });
 
     const agentSessionCalls: AgentSessionCall[] = [];
+    const watchOptions = createWatchOptions();
     await expect(
       startPiRepositoryVerification(
         {
@@ -447,6 +763,8 @@ describe("pi runner service", () => {
           runCommand,
           createId: () => "session-after-failure",
           createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+          evaluateWatchOnce: watchOptions.evaluateWatchOnce,
+          sleep: watchOptions.sleep,
         },
         createPullRequestSummary(),
       ),
@@ -460,6 +778,7 @@ describe("pi runner service", () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
+    const watchOptions = createWatchOptions();
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -472,7 +791,10 @@ describe("pi runner service", () => {
         runCommand,
         createId: () => "session-retry",
         createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        evaluateWatchOnce: watchOptions.evaluateWatchOnce,
         now: () => "2026-06-06T12:00:00.000Z",
+        sleep: watchOptions.sleep,
+        watchPollMilliseconds: watchOptions.watchPollMilliseconds,
       },
       createPullRequestSummary(),
     );

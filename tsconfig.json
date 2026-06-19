@@ -13,7 +13,8 @@
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "paths": {
-      "@pr-rosey/desktop/*": ["./apps/desktop/src/*"]
+      "@pr-rosey/desktop/*": ["./apps/desktop/src/*"],
+      "@pr-rosey/pr-watch": ["./packages/pr-watch/src/index.ts"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,

@@ -9,11 +9,13 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
+    "rootDir": "../..",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "paths": {
-      "@pr-rosey/desktop/*": ["./src/*"]
+      "@pr-rosey/desktop/*": ["./src/*"],
+      "@pr-rosey/pr-watch": ["../../packages/pr-watch/src/index.ts"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,
