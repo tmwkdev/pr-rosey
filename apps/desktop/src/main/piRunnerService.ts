@@ -95,7 +95,6 @@ const maxVisibleActivityEvents = 80;
 const maxVisibleOutputLines = 40;
 const readOnlyPiToolNames = ["read", "grep", "find", "ls"] as const;
 const defaultWatchPollMilliseconds = 60_000;
-const staticAnalysisProbe: string = 42;
 
 function nowIso(options: PiRunnerServiceOptions): string {
   return options.now?.() ?? new Date().toISOString();
