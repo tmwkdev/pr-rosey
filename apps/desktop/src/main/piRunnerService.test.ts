@@ -302,7 +302,7 @@ describe("pi runner service", () => {
     ).rejects.toThrow("Map owner/repo to a trusted local clone in Settings before starting Pi.");
   });
 
-  it("starts a Pi AgentSession in the mapped repository and sends the babysit prompt", async () => {
+  it("starts a watch session in the mapped repository without starting Pi or spending prompt tokens", async () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
@@ -327,14 +327,7 @@ describe("pi runner service", () => {
       createPullRequestSummary(),
     );
 
-    expect(agentSessionCalls).toHaveLength(1);
-    expect(agentSessionCalls[0]).toMatchObject({
-      cwd: repositoryRootPath,
-      sessionDir: path.join(userDataPath, "pi-agent-sessions", "session-1"),
-      tools: ["read", "grep", "find", "ls"],
-    });
-    expect(agentSessionCalls[0].session.prompts.join("")).toContain("Repository: owner/repo");
-    expect(agentSessionCalls[0].session.prompts.join("")).toContain("BABYSIT REPORT");
+    expect(agentSessionCalls).toHaveLength(0);
     expect(session).toMatchObject({
       id: "session-1",
       status: "running",
@@ -342,19 +335,13 @@ describe("pi runner service", () => {
       pid: null,
       logFilePath: path.join(userDataPath, "pi-runner-logs", "session-1.jsonl"),
     });
-    expect(session.conversation).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          role: "user",
-          body: expect.stringContaining("Repository: owner/repo"),
-        }),
-      ]),
-    );
+    expect(session.conversation).toEqual([]);
 
     const logFile = await readFile(session.logFilePath, "utf8");
-    expect(logFile).toContain("Starting Pi AgentSession");
-    expect(logFile).toContain("Created Pi AgentSession");
-    expect(logFile).toContain("Sent read-only babysit prompt");
+    expect(logFile).toContain("Starting PR watch for owner/repo#12");
+    expect(logFile).not.toContain("Starting Pi AgentSession");
+    expect(logFile).not.toContain("Created Pi AgentSession");
+    expect(logFile).not.toContain("Sent read-only babysit prompt");
   });
 
   it("starts an autonomous PR watch loop for the selected pull request", async () => {
@@ -394,6 +381,7 @@ describe("pi runner service", () => {
       maxIterations: 1,
     });
     expect(watchOptions.calls[0].stateFile).toContain("pr-watch-sessions/session-watch-state.json");
+    expect(agentSessionCalls).toHaveLength(0);
 
     const runningSession = listPiRunnerSessions()[0];
     expect(runningSession.status).toBe("running");
@@ -436,13 +424,19 @@ describe("pi runner service", () => {
     );
 
     await vi.waitFor(() => {
-      expect(agentSessionCalls[0].session.prompts).toHaveLength(2);
+      expect(agentSessionCalls).toHaveLength(1);
     });
 
-    expect(agentSessionCalls[0].session.prompts[1]).toContain("PR-WATCH UPDATE");
-    expect(agentSessionCalls[0].session.prompts[1]).toContain("Decision: diagnose_branch_failure");
-    expect(agentSessionCalls[0].session.prompts[1]).toContain("Lint and typecheck");
-    expect(agentSessionCalls[0].session.prompts[1]).toContain("Use read-only tools only");
+    expect(agentSessionCalls[0]).toMatchObject({
+      cwd: repositoryRootPath,
+      sessionDir: path.join(userDataPath, "pi-agent-sessions", "session-diagnose"),
+      tools: ["read", "grep", "find", "ls"],
+    });
+    expect(agentSessionCalls[0].session.prompts).toHaveLength(1);
+    expect(agentSessionCalls[0].session.prompts[0]).toContain("PR-WATCH UPDATE");
+    expect(agentSessionCalls[0].session.prompts[0]).toContain("Decision: diagnose_branch_failure");
+    expect(agentSessionCalls[0].session.prompts[0]).toContain("Lint and typecheck");
+    expect(agentSessionCalls[0].session.prompts[0]).toContain("Use read-only tools only");
     expect(listPiRunnerSessions()[0]).toMatchObject({
       id: "session-diagnose",
       status: "running",
@@ -483,8 +477,8 @@ describe("pi runner service", () => {
       expect(watchCalls).toHaveLength(2);
     });
 
-    expect(agentSessionCalls[0].session.prompts).toHaveLength(2);
-    expect(agentSessionCalls[0].session.prompts[1]).toContain("PR-WATCH UPDATE");
+    expect(agentSessionCalls[0].session.prompts).toHaveLength(1);
+    expect(agentSessionCalls[0].session.prompts[0]).toContain("PR-WATCH UPDATE");
     expect(listPiRunnerSessions()[0].activityEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -524,7 +518,7 @@ describe("pi runner service", () => {
     });
 
     const stoppedSession = listPiRunnerSessions()[0];
-    expect(agentSessionCalls[0].session.disposed).toBe(true);
+    expect(agentSessionCalls).toHaveLength(0);
     expect(stoppedSession.activityEvents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -543,7 +537,7 @@ describe("pi runner service", () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
-    const watchOptions = createWatchOptions();
+    const watchOptions = createWatchOptions(createWatchReport("diagnose_branch_failure"));
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -563,6 +557,10 @@ describe("pi runner service", () => {
       },
       createPullRequestSummary(),
     );
+
+    await vi.waitFor(() => {
+      expect(agentSessionCalls).toHaveLength(1);
+    });
 
     const assistantMessage = {
       role: "assistant",
@@ -637,6 +635,23 @@ describe("pi runner service", () => {
       ]),
     );
 
+    agentSessionCalls[0].session.emit({ type: "agent_end", messages: [], willRetry: false });
+
+    await vi.waitFor(() => {
+      expect(listPiRunnerSessions()[0].status).toBe("aborted");
+    });
+
+    const abortedSession = listPiRunnerSessions()[0];
+    expect(abortedSession).toMatchObject({
+      id: "session-2",
+      status: "aborted",
+      exitCode: 0,
+      error: null,
+    });
+    expect(abortedSession.outputLines.map((line) => line.message)).toContain(
+      "Pi AgentSession stopped after abort.",
+    );
+
     await expect(
       startPiRepositoryVerification(
         {
@@ -649,14 +664,17 @@ describe("pi runner service", () => {
         },
         createPullRequestSummary(),
       ),
-    ).rejects.toThrow("A Pi babysit session is already running.");
+    ).resolves.toMatchObject({
+      id: "session-3",
+      status: "running",
+    });
   });
 
   it("keeps tool-only assistant messages and tool results out of the human conversation", async () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
-    const watchOptions = createWatchOptions();
+    const watchOptions = createWatchOptions(createWatchReport("diagnose_branch_failure"));
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -676,6 +694,10 @@ describe("pi runner service", () => {
       },
       createPullRequestSummary(),
     );
+
+    await vi.waitFor(() => {
+      expect(agentSessionCalls).toHaveLength(1);
+    });
 
     agentSessionCalls[0].session.messages = [
       ...agentSessionCalls[0].session.messages,
@@ -722,7 +744,7 @@ describe("pi runner service", () => {
     );
   });
 
-  it("records failed startup and does not leave an active blocker when AgentSession creation fails", async () => {
+  it("records failed lazy Pi startup and does not leave an active blocker", async () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
 
@@ -731,20 +753,24 @@ describe("pi runner service", () => {
       { repositoryNameWithOwner: "owner/repo", localPath: repositoryRootPath },
     );
 
-    await expect(
-      startPiRepositoryVerification(
-        {
-          userDataPath,
-          runCommand,
-          createId: () => "session-failed",
-          createAgentSession: async () => {
-            throw new Error("SDK unavailable");
-          },
-          now: () => "2026-06-06T12:00:00.000Z",
+    await startPiRepositoryVerification(
+      {
+        userDataPath,
+        runCommand,
+        createId: () => "session-failed",
+        createAgentSession: async () => {
+          throw new Error("SDK unavailable");
         },
-        createPullRequestSummary(),
-      ),
-    ).rejects.toThrow("SDK unavailable");
+        evaluateWatchOnce: createWatchOptions(createWatchReport("diagnose_branch_failure"))
+          .evaluateWatchOnce,
+        now: () => "2026-06-06T12:00:00.000Z",
+      },
+      createPullRequestSummary(),
+    );
+
+    await vi.waitFor(() => {
+      expect(listPiRunnerSessions()[0].status).toBe("failed");
+    });
 
     const failedSession = listPiRunnerSessions()[0];
     expect(failedSession).toMatchObject({
@@ -778,7 +804,7 @@ describe("pi runner service", () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
-    const watchOptions = createWatchOptions();
+    const watchOptions = createWatchOptions(createWatchReport("diagnose_branch_failure"));
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -798,6 +824,10 @@ describe("pi runner service", () => {
       },
       createPullRequestSummary(),
     );
+
+    await vi.waitFor(() => {
+      expect(agentSessionCalls).toHaveLength(1);
+    });
 
     agentSessionCalls[0].session.emit({ type: "agent_end", messages: [], willRetry: true });
 

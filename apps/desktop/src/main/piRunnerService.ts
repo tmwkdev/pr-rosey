@@ -69,11 +69,11 @@ type CreatePiAgentSession = (input: {
 }) => Promise<PiAgentSession>;
 
 type PiRunnerRuntime = {
-  agentSession: PiAgentSession;
+  agentSession?: PiAgentSession;
   promptedWatchKeys: Set<string>;
   promptQueue: Promise<void>;
   watchAbortController: AbortController;
-  unsubscribe: () => void;
+  unsubscribe?: () => void;
 };
 
 type EvaluateWatchOnce = (options: CliOptions) => Promise<WatchReport>;
@@ -95,6 +95,7 @@ const maxVisibleActivityEvents = 80;
 const maxVisibleOutputLines = 40;
 const readOnlyPiToolNames = ["read", "grep", "find", "ls"] as const;
 const defaultWatchPollMilliseconds = 60_000;
+const staticAnalysisProbe: string = 42;
 
 function nowIso(options: PiRunnerServiceOptions): string {
   return options.now?.() ?? new Date().toISOString();
@@ -199,8 +200,8 @@ async function finishSession(
 
   const runtime = runtimes.get(session.id);
   runtime?.watchAbortController.abort();
-  runtime?.unsubscribe();
-  runtime?.agentSession.dispose();
+  runtime?.unsubscribe?.();
+  runtime?.agentSession?.dispose();
   runtimes.delete(session.id);
 
   session.status = status;
@@ -619,6 +620,105 @@ export function createPiBabysitPrompt(pullRequest: PullRequestSummary, localPath
 
 export const createPiRepositoryVerificationPrompt = createPiBabysitPrompt;
 
+async function ensurePiAgentSession(
+  options: PiRunnerServiceOptions,
+  session: PiRunnerSessionSnapshot,
+): Promise<PiAgentSession | null> {
+  const runtime = runtimes.get(session.id);
+
+  if (!runtime || !isActiveSession(session)) {
+    return null;
+  }
+
+  if (runtime.agentSession) {
+    return runtime.agentSession;
+  }
+
+  await recordSessionLine(
+    session,
+    "system",
+    `Starting Pi AgentSession in ${session.localPath}.`,
+    nowIso(options),
+  );
+
+  let agentSession: PiAgentSession;
+
+  try {
+    agentSession = await (options.createAgentSession ?? createDefaultPiAgentSession)({
+      cwd: session.localPath,
+      sessionDir: getPiSessionDir(options.userDataPath, session.id),
+      tools: readOnlyPiToolNames,
+    });
+  } catch (error) {
+    const failedAt = nowIso(options);
+    const message = error instanceof Error ? error.message : "Could not create Pi AgentSession.";
+    await finishSession(
+      session,
+      "failed",
+      failedAt,
+      1,
+      `Pi AgentSession failed before prompt: ${message}`,
+      message,
+    );
+    throw error;
+  }
+
+  session.pid = null;
+  session.conversation = getConversationFromAgentMessages(agentSession.messages);
+  await recordSessionLine(
+    session,
+    "system",
+    `Created Pi AgentSession ${agentSession.sessionId}${
+      agentSession.sessionFile ? ` at ${agentSession.sessionFile}` : ""
+    }.`,
+    nowIso(options),
+  );
+
+  const unsubscribe = agentSession.subscribe((event) => {
+    const timestamp = nowIso(options);
+    session.updatedAt = timestamp;
+
+    if (event.type === "message_update" && event.message) {
+      session.conversation = getConversationFromAgentMessages(agentSession.messages, event.message);
+      return;
+    }
+
+    if (event.type === "message_end" || event.type === "turn_end" || event.type === "agent_end") {
+      const messages =
+        event.type === "agent_end" && Array.isArray(event.messages)
+          ? event.messages
+          : agentSession.messages;
+      session.conversation = getConversationFromAgentMessages(messages);
+    }
+
+    const activityEvent = createActivityEventFromAgentEvent(event, timestamp);
+    if (activityEvent) {
+      void recordSessionActivity(session, activityEvent).catch(() => undefined);
+    }
+
+    if (event.type === "agent_end") {
+      if (event.willRetry) {
+        return;
+      }
+
+      if (session.status === "aborting") {
+        void finishSession(
+          session,
+          "aborted",
+          timestamp,
+          0,
+          "Pi AgentSession stopped after abort.",
+        ).catch(() => undefined);
+      }
+    }
+  });
+
+  runtime.agentSession = agentSession;
+  runtime.unsubscribe = unsubscribe;
+
+  return agentSession;
+}
+
 async function queuePiPrompt(
   options: PiRunnerServiceOptions,
   session: PiRunnerSessionSnapshot,
@@ -628,6 +728,12 @@ async function queuePiPrompt(
   const runtime = runtimes.get(session.id);
 
   if (!runtime || !isActiveSession(session)) {
+    return;
+  }
+
+  const agentSession = await ensurePiAgentSession(options, session);
+
+  if (!agentSession) {
     return;
   }
 
@@ -649,7 +755,7 @@ async function queuePiPrompt(
     .catch(() => undefined)
     .then(async () => {
       if (!runtime.watchAbortController.signal.aborted && isActiveSession(session)) {
-        await runtime.agentSession.prompt(prompt);
+        await agentSession.prompt(prompt);
       }
     })
     .catch((error: unknown) => {
@@ -798,8 +904,8 @@ export function listPiRunnerSessions(): PiRunnerSessionSnapshot[] {
 export function resetPiRunnerSessionsForTests(): void {
   for (const runtime of runtimes.values()) {
     runtime.watchAbortController.abort();
-    runtime.unsubscribe();
-    runtime.agentSession.dispose();
+    runtime.unsubscribe?.();
+    runtime.agentSession?.dispose();
   }
 
   runtimes.clear();
@@ -866,105 +972,21 @@ export async function startPiRepositoryVerification(
   };
 
   sessions.set(session.id, session);
+  session.status = "running";
   await recordSessionLine(
     session,
     "system",
-    `Starting Pi AgentSession in ${inspection.localPath}.`,
+    `Starting PR watch for ${pullRequest.repository.nameWithOwner}#${pullRequest.number}.`,
     startedAt,
   );
 
-  let agentSession: PiAgentSession;
-
-  try {
-    agentSession = await (options.createAgentSession ?? createDefaultPiAgentSession)({
-      cwd: inspection.localPath,
-      sessionDir: getPiSessionDir(options.userDataPath, session.id),
-      tools: readOnlyPiToolNames,
-    });
-  } catch (error) {
-    const failedAt = nowIso(options);
-    session.status = "failed";
-    session.error = error instanceof Error ? error.message : "Could not create Pi AgentSession.";
-    session.exitedAt = failedAt;
-    session.exitCode = 1;
-    session.updatedAt = failedAt;
-    await recordSessionLine(
-      session,
-      "system",
-      `Pi AgentSession failed before prompt: ${session.error}`,
-      failedAt,
-    );
-
-    throw error;
-  }
-
-  session.pid = null;
-  session.status = "running";
-  session.conversation = getConversationFromAgentMessages(agentSession.messages);
-  await recordSessionLine(
-    session,
-    "system",
-    `Created Pi AgentSession ${agentSession.sessionId}${
-      agentSession.sessionFile ? ` at ${agentSession.sessionFile}` : ""
-    }.`,
-    nowIso(options),
-  );
-
   const watchAbortController = new AbortController();
-  const unsubscribe = agentSession.subscribe((event) => {
-    const timestamp = nowIso(options);
-    session.updatedAt = timestamp;
-
-    if (event.type === "message_update" && event.message) {
-      session.conversation = getConversationFromAgentMessages(agentSession.messages, event.message);
-      return;
-    }
-
-    if (event.type === "message_end" || event.type === "turn_end" || event.type === "agent_end") {
-      const messages =
-        event.type === "agent_end" && Array.isArray(event.messages)
-          ? event.messages
-          : agentSession.messages;
-      session.conversation = getConversationFromAgentMessages(messages);
-    }
-
-    const activityEvent = createActivityEventFromAgentEvent(event, timestamp);
-    if (activityEvent) {
-      void recordSessionActivity(session, activityEvent).catch(() => undefined);
-    }
-
-    if (event.type === "agent_end") {
-      if (event.willRetry) {
-        return;
-      }
-
-      if (session.status === "aborting") {
-        void finishSession(
-          session,
-          "aborted",
-          timestamp,
-          0,
-          "Pi AgentSession stopped after abort.",
-        ).catch(() => undefined);
-      }
-    }
-  });
 
   runtimes.set(session.id, {
-    agentSession,
     promptedWatchKeys: new Set(),
     promptQueue: Promise.resolve(),
     watchAbortController,
-    unsubscribe,
   });
-
-  const prompt = createPiBabysitPrompt(pullRequest, inspection.localPath);
-  await queuePiPrompt(
-    options,
-    session,
-    prompt,
-    `Sent read-only babysit prompt for ${pullRequest.repository.nameWithOwner}#${pullRequest.number}.`,
-  );
 
   void runBabysitWatchLoop(options, session, pullRequest).catch((error: unknown) => {
     const timestamp = nowIso(options);
@@ -1002,6 +1024,12 @@ export async function abortPiRunnerSession(
   session.updatedAt = nowIso(options);
   await recordSessionLine(session, "system", "Abort requested by user.", session.updatedAt);
   runtime.watchAbortController.abort();
+
+  if (!runtime.agentSession) {
+    await finishSession(session, "aborted", session.updatedAt, 0, "PR watch stopped after abort.");
+    return snapshotSession(session);
+  }
+
   await runtime.agentSession.abort();
 
   return snapshotSession(session);

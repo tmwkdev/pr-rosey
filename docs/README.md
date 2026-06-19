@@ -15,6 +15,8 @@ the next agent or human who needs to make a product change.
 - `agent-runner.md` - managed PR runner direction, Pi integration, auth, worktrees, and delivery
   phases
 - `frontend.md` - renderer styling, component, token, badge, and status guidance
+- `autonomous-babysit-rubric.md` - binary scorecard for the desktop `Babysit` button's autonomous
+  behavior and token discipline
 - `babysit-skill-goal.md` - PR babysitting skill success scorecard
 - `babysit-skill-adoption-review.md` - human similarity-review checklist for adopting the PR watch
   skill

@@ -8,6 +8,10 @@ control flow.
 This is an engineering scorecard, not legal advice. It reduces implementation and similarity risk,
 but it does not replace a legal review if one is needed.
 
+For the desktop app button behavior, use `docs/autonomous-babysit-rubric.md`. This file scores the
+repo-owned skill/package shape; the app-button rubric scores autonomous watching, escalation, and
+token discipline.
+
 ## Pass Rule
 
 The skill passes when both conditions are true:

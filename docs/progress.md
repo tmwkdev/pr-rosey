@@ -4,6 +4,31 @@ This file is the latest restart surface for the next agent session. Keep it shor
 current verified state, known risk, and the next approved step. Move durable history
 into `docs/plans/completed/` when it matters later.
 
+## 2026-06-19 Autonomous Babysit Rubric And Prompt Discipline Receipt
+
+- Approved scope: continue the user-requested work to make the PR row `Babysit` action more
+  autonomous, closer in behavior shape to upstream PR babysitting while staying original,
+  local-first, non-mutating, and cheaper than generating obvious reports from Pi.
+- Changed: added `docs/autonomous-babysit-rubric.md` with binary critical and standard checks for
+  app-button autonomy, strict stop conditions, escalation, watch/API-first behavior, token
+  discipline, visible state, and fixture evidence. Linked it from the docs map and clarified its
+  relationship to the older skill-package scorecard.
+- Changed: desktop babysit sessions no longer start Pi or send an unconditional startup
+  `BABYSIT REPORT` prompt. The main-process watch loop now evaluates PR state first, starts Pi only
+  when repository diagnosis is needed, and sends a read-only `PR-WATCH UPDATE` when the watcher
+  selects a branch-failure or early-failed-job diagnosis path.
+- Safety preserved: no hosted backend, OAuth, automatic commits, pushes, merges, GitHub comments,
+  review-thread resolution, or CI reruns were added. Pi remains constrained to read-only tools when
+  prompted.
+- Verification: focused PR-watch tests passed with 16 tests; focused desktop Pi runner tests passed
+  with 11 tests; final `npm run check` passed with lint, typecheck, and 46 tests; `npm run dev`
+  launched Electron/Vite at `http://localhost:5173/`, and `curl -I` returned HTTP 200.
+- Review: first separate reviewer found a lazy-Pi typecheck failure, active-plan contradiction, and
+  stale progress receipt; fixes were applied. Follow-up reviewer found stale active-plan Pi RPC/SDK
+  wording and missing final-abort cleanup coverage; fixes were applied and `npm run check` passed.
+- Remaining risk: in-app Browser visual verification still reports `Browser is not available: iab`;
+  no live GitHub/Pi babysit run was executed in this session.
+
 ## 2026-06-15 Autonomous Babysit Loop Receipt
 
 - Approved scope: user-requested follow-up to make the PR row `Babysit` action work more
