@@ -104,6 +104,7 @@ const readOnlyPiToolNames = ["read", "grep", "find", "ls"] as const;
 const defaultWatchPollMilliseconds = 60_000;
 const staticAnalysisCheckNames = ["lint and typecheck", "static analysis"] as const;
 const staticAnalysisAutofixCommitMessage = "Fix static analysis failure";
+const staticAnalysisProbe: string = 42;
 
 function nowIso(options: PiRunnerServiceOptions): string {
   return options.now?.() ?? new Date().toISOString();
