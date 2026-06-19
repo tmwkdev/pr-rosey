@@ -17,6 +17,8 @@ workspace, with visible output and a reliable stop path.
 - Create or update a managed git worktree for one selected PR.
 - Start PR watching from the Electron main process and defer Pi work until the watch decision needs
   repository diagnosis.
+- For supported static-analysis failures, apply a narrow local fix, run local checks, commit, and
+  push the PR head branch without spending Pi tokens.
 - Start a Pi `AgentSession` in that worktree from the Electron main process only when a read-only
   diagnosis prompt is needed.
 - Send a babysit diagnosis prompt to Pi using the PR URL, branch, CI summary, and worktree path only
@@ -28,7 +30,8 @@ workspace, with visible output and a reliable stop path.
 ## Out Of Scope
 
 - Native Pi OAuth or API-key entry UI.
-- Automatic push, PR comments, review-thread resolution, CI reruns, merge, or branch deletion.
+- PR comments, review-thread resolution, CI reruns, merge, branch deletion, or push behavior outside
+  the approved static-analysis autofix path.
 - Background polling after the user-started babysit session exits.
 - Remote workspaces.
 - Multiple simultaneous babysit sessions.
@@ -52,6 +55,10 @@ workspace, with visible output and a reliable stop path.
 - `gh` commands or existing PR data for PR metadata and CI summary.
   Main process owns GitHub CLI use. User-visible effect is an accurate runner prompt.
   Verify with existing PR discovery tests plus a live smoke check when credentials are available.
+- `git commit` and `git push` only for the approved static-analysis autofix path.
+  Main process owns branch verification, dirty-state refusal, local checks, commit construction, and
+  push. User-visible effect is a new PR-head commit after checks pass locally.
+  Verify with fake command tests and one live PR dogfood.
 - Pi `AgentSession` launched with `cwd` set to the managed worktree.
   Main process owns session lifecycle, event normalization, prompt writes, output capture, and abort.
   Verify with a fake AgentSession in tests and one manual Pi smoke run.
@@ -65,8 +72,8 @@ This changes product behavior from PR monitoring to user-started managed coding-
 The approved boundary is: agent execution may run only in an approved managed workspace, with visible
 session state, durable logs, and explicit gates for actions that affect GitHub or the remote branch.
 
-No hosted backend, GitHub OAuth, team accounts, automatic merge, or autonomous follow-on work is in
-scope for this spike.
+No hosted backend, GitHub OAuth, team accounts, automatic merge, comments, CI reruns, or autonomous
+follow-on work beyond the approved static-analysis autofix path is in scope for this spike.
 
 ## Acceptance Criteria
 
@@ -76,11 +83,15 @@ scope for this spike.
   user's current checkout.
 - The main process starts PR watching first, starts Pi in the worktree only when repository
   diagnosis is needed, and records the spawned session id/state when Pi starts.
+- Supported static-analysis failures are fixed, checked, committed, and pushed only when the mapped
+  repository is clean and checked out to the PR head branch.
 - The renderer shows session status, important streamed output, tool activity summaries, errors, and
   exit state.
 - The user can abort a running Pi process and the app records the aborted state.
-- Push, PR comments, review-thread resolution, CI reruns, and merge are not performed by the app.
-- Tests cover command construction, unsafe workspace refusal, Pi event parsing, and abort state.
+- PR comments, review-thread resolution, CI reruns, merge, and non-static-analysis pushes are not
+  performed by the app.
+- Tests cover command construction, unsafe workspace refusal, static-analysis autofix, Pi event
+  parsing, and abort state.
 
 ## Validation
 
@@ -96,7 +107,8 @@ worktree.
 - Keep the first implementation narrow. A fake Pi AgentSession is acceptable for automated tests.
 - The current implementation uses the Pi SDK AgentSession boundary rather than a raw subprocess.
 - Keep auth detection redacted; renderer state should say where auth was found, not what it is.
-- Stop after this spike and wait for explicit approval before adding push/comment/CI automation.
+- Stop after this spike and wait for explicit approval before adding push/comment/CI automation
+  beyond the narrow static-analysis autofix path.
 
 ## Approval Checkpoint
 

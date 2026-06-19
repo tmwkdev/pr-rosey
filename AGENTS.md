@@ -21,7 +21,10 @@ explicit approved capability gate.
 ## Current Product Boundaries
 
 - No GitHub OAuth, hosted auth, hosted backend, or team accounts.
-- No automatic commits, pushes, merges, PR comments, review-thread resolution, or CI reruns.
+- No automatic commits, pushes, merges, PR comments, review-thread resolution, or CI reruns unless
+  an explicitly approved capability-gated work item names that exact action. The current approved
+  exception is the narrow static-analysis autofix path, which may commit and push only after local
+  checks pass on the PR head branch.
 - No direct or unmanaged AI-agent execution.
 - Agent execution work, when explicitly approved, must stay visible, logged, cancellable,
   capability-gated, and owned by the Electron main process.

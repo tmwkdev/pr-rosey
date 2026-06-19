@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -9,7 +9,7 @@ import {
   startPiRepositoryVerification,
 } from "@pr-rosey/desktop/main/piRunnerService";
 import { saveRepositoryMapping } from "@pr-rosey/desktop/main/repositoryMappingService";
-import type { ShellCommandResult } from "@pr-rosey/desktop/main/shellCommand";
+import type { ShellCommandError, ShellCommandResult } from "@pr-rosey/desktop/main/shellCommand";
 import type { PullRequestSummary } from "@pr-rosey/desktop/shared/pullRequests";
 import type { CliOptions, WatchAction, WatchReport } from "@pr-rosey/pr-watch";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -254,6 +254,85 @@ function createWatchReport(
   };
 }
 
+function createNonStaticBranchFailureReport(): WatchReport {
+  const failedChecks = [
+    {
+      name: "Unit tests",
+      result: "fail" as const,
+      workflow: "CI",
+      url: "https://github.com/owner/repo/actions/runs/1/job/3",
+      headSha: "abc123",
+      failureCause: "branch" as const,
+      summary: "Vitest failed",
+    },
+  ];
+
+  return createWatchReport("diagnose_branch_failure", { failedChecks });
+}
+
+function createTypecheckError(stdout: string): ShellCommandError {
+  const error = new Error("typecheck failed") as ShellCommandError;
+  error.stdout = stdout;
+  error.stderr = "";
+  return error;
+}
+
+function createAutofixRunCommand(repositoryRootPath: string, calls: string[]) {
+  return async (command: string, args: string[] = []) => {
+    calls.push([command, ...args].join(" "));
+
+    if (command === "npm") {
+      const scriptName = args.at(-1);
+
+      if (scriptName === "typecheck") {
+        throw createTypecheckError(
+          "apps/desktop/src/main/piRunnerService.ts(2,7): error TS2322: Type 'number' is not assignable to type 'string'.",
+        );
+      }
+
+      if (scriptName === "check") {
+        return createResult("check passed\n");
+      }
+    }
+
+    const subcommand = args.slice(2).join(" ");
+
+    if (subcommand === "rev-parse --is-inside-work-tree") {
+      return createResult("true\n");
+    }
+
+    if (subcommand === "rev-parse --show-toplevel") {
+      return createResult(`${repositoryRootPath}\n`);
+    }
+
+    if (subcommand === "remote get-url origin") {
+      return createResult("https://github.com/owner/repo.git\n");
+    }
+
+    if (subcommand === "branch --show-current") {
+      return createResult("feature\n");
+    }
+
+    if (subcommand === "status --porcelain") {
+      return createResult("");
+    }
+
+    if (subcommand.startsWith("add ")) {
+      return createResult("");
+    }
+
+    if (subcommand === "commit -m Fix static analysis failure") {
+      return createResult("[feature abc123] Fix static analysis failure\n");
+    }
+
+    if (subcommand === "push origin feature") {
+      return createResult("");
+    }
+
+    throw new Error(`Unexpected command: ${command} ${args.join(" ")}`);
+  };
+}
+
 function createWatchOptions(report = createWatchReport()) {
   const calls: WatchCall[] = [];
   return {
@@ -398,11 +477,77 @@ describe("pi runner service", () => {
     );
   });
 
+  it("autofixes and pushes a narrow static-analysis failure without starting Pi", async () => {
+    const repositoryRootPath = path.join(userDataPath, "repo");
+    await mkdir(path.join(repositoryRootPath, "apps/desktop/src/main"), { recursive: true });
+    const sourceFilePath = path.join(
+      repositoryRootPath,
+      "apps/desktop/src/main/piRunnerService.ts",
+    );
+    await writeFile(
+      sourceFilePath,
+      ['const ok = "ready";', "const staticAnalysisProbe: string = 42;", ""].join("\n"),
+      "utf8",
+    );
+    const runCommandCalls: string[] = [];
+    const runCommand = createAutofixRunCommand(repositoryRootPath, runCommandCalls);
+    const agentSessionCalls: AgentSessionCall[] = [];
+    const watchOptions = createWatchOptions(createWatchReport("diagnose_branch_failure"));
+
+    await saveRepositoryMapping(
+      { userDataPath, runCommand },
+      { repositoryNameWithOwner: "owner/repo", localPath: repositoryRootPath },
+    );
+
+    await startPiRepositoryVerification(
+      {
+        userDataPath,
+        runCommand,
+        createId: () => "session-autofix",
+        createAgentSession: createTestAgentSessionFactory(agentSessionCalls),
+        evaluateWatchOnce: watchOptions.evaluateWatchOnce,
+        maxWatchIterations: 1,
+        now: () => "2026-06-06T12:00:00.000Z",
+        sleep: async () => undefined,
+        watchPollMilliseconds: 5,
+      },
+      createPullRequestSummary(),
+    );
+
+    await vi.waitFor(() => {
+      expect(runCommandCalls).toContain(`git -C ${repositoryRootPath} push origin feature`);
+    });
+
+    await expect(readFile(sourceFilePath, "utf8")).resolves.toContain(
+      'const staticAnalysisProbe: string = "42";',
+    );
+    expect(agentSessionCalls).toHaveLength(0);
+    expect(runCommandCalls).toEqual(
+      expect.arrayContaining([
+        `git -C ${repositoryRootPath} branch --show-current`,
+        `git -C ${repositoryRootPath} status --porcelain`,
+        `npm --prefix ${repositoryRootPath} run typecheck`,
+        `npm --prefix ${repositoryRootPath} run check`,
+        `git -C ${repositoryRootPath} add apps/desktop/src/main/piRunnerService.ts`,
+        `git -C ${repositoryRootPath} commit -m Fix static analysis failure`,
+        `git -C ${repositoryRootPath} push origin feature`,
+      ]),
+    );
+    expect(listPiRunnerSessions()[0].activityEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Static analysis fix pushed",
+          status: "success",
+        }),
+      ]),
+    );
+  });
+
   it("asks Pi for read-only diagnosis when PR watch finds a branch failure", async () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
-    const watchOptions = createWatchOptions(createWatchReport("diagnose_branch_failure"));
+    const watchOptions = createWatchOptions(createNonStaticBranchFailureReport());
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -435,7 +580,7 @@ describe("pi runner service", () => {
     expect(agentSessionCalls[0].session.prompts).toHaveLength(1);
     expect(agentSessionCalls[0].session.prompts[0]).toContain("PR-WATCH UPDATE");
     expect(agentSessionCalls[0].session.prompts[0]).toContain("Decision: diagnose_branch_failure");
-    expect(agentSessionCalls[0].session.prompts[0]).toContain("Lint and typecheck");
+    expect(agentSessionCalls[0].session.prompts[0]).toContain("Unit tests");
     expect(agentSessionCalls[0].session.prompts[0]).toContain("Use read-only tools only");
     expect(listPiRunnerSessions()[0]).toMatchObject({
       id: "session-diagnose",
@@ -447,7 +592,7 @@ describe("pi runner service", () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
-    const report = createWatchReport("diagnose_branch_failure");
+    const report = createNonStaticBranchFailureReport();
     const watchCalls: CliOptions[] = [];
 
     await saveRepositoryMapping(
@@ -537,7 +682,7 @@ describe("pi runner service", () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
-    const watchOptions = createWatchOptions(createWatchReport("diagnose_branch_failure"));
+    const watchOptions = createWatchOptions(createNonStaticBranchFailureReport());
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -674,7 +819,7 @@ describe("pi runner service", () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
-    const watchOptions = createWatchOptions(createWatchReport("diagnose_branch_failure"));
+    const watchOptions = createWatchOptions(createNonStaticBranchFailureReport());
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },
@@ -761,7 +906,7 @@ describe("pi runner service", () => {
         createAgentSession: async () => {
           throw new Error("SDK unavailable");
         },
-        evaluateWatchOnce: createWatchOptions(createWatchReport("diagnose_branch_failure"))
+        evaluateWatchOnce: createWatchOptions(createNonStaticBranchFailureReport())
           .evaluateWatchOnce,
         now: () => "2026-06-06T12:00:00.000Z",
       },
@@ -804,7 +949,7 @@ describe("pi runner service", () => {
     const repositoryRootPath = path.join(userDataPath, "repo");
     const runCommand = createTestRunCommand(repositoryRootPath);
     const agentSessionCalls: AgentSessionCall[] = [];
-    const watchOptions = createWatchOptions(createWatchReport("diagnose_branch_failure"));
+    const watchOptions = createWatchOptions(createNonStaticBranchFailureReport());
 
     await saveRepositoryMapping(
       { userDataPath, runCommand },

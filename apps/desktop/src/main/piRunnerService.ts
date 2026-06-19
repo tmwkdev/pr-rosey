@@ -1,11 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   inspectLocalRepository,
   listRepositoryMappings,
   type RepositoryMappingServiceOptions,
 } from "@pr-rosey/desktop/main/repositoryMappingService";
+import {
+  runShellCommand,
+  type ShellCommandError,
+  type ShellCommandResult,
+} from "@pr-rosey/desktop/main/shellCommand";
 import {
   createPiRunnerActivityEvent,
   type PiRunnerActivityEvent,
@@ -80,6 +85,8 @@ type EvaluateWatchOnce = (options: CliOptions) => Promise<WatchReport>;
 
 type Sleep = (milliseconds: number, signal: AbortSignal) => Promise<void>;
 
+type ShellCommandRunner = (command: string, args?: string[]) => Promise<ShellCommandResult>;
+
 export type PiRunnerServiceOptions = RepositoryMappingServiceOptions & {
   createId?: () => string;
   createAgentSession?: CreatePiAgentSession;
@@ -95,6 +102,8 @@ const maxVisibleActivityEvents = 80;
 const maxVisibleOutputLines = 40;
 const readOnlyPiToolNames = ["read", "grep", "find", "ls"] as const;
 const defaultWatchPollMilliseconds = 60_000;
+const staticAnalysisCheckNames = ["lint and typecheck", "static analysis"] as const;
+const staticAnalysisAutofixCommitMessage = "Fix static analysis failure";
 
 function nowIso(options: PiRunnerServiceOptions): string {
   return options.now?.() ?? new Date().toISOString();
@@ -282,6 +291,234 @@ function getWatchDiagnosisPromptKey(report: WatchReport): string {
     .join(",");
 
   return [report.decision.action, report.decision.currentSha, failedCheckNames].join(":");
+}
+
+function getRunner(options: PiRunnerServiceOptions): ShellCommandRunner {
+  return options.runCommand ?? runShellCommand;
+}
+
+function commandOutput(error: unknown): string {
+  const shellError = error as ShellCommandError;
+  return [shellError.stdout, shellError.stderr, error instanceof Error ? error.message : ""]
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+    .join("\n")
+    .trim();
+}
+
+async function runCommandText(
+  options: PiRunnerServiceOptions,
+  command: string,
+  args: string[],
+): Promise<string> {
+  const result = await getRunner(options)(command, args);
+  return `${result.stdout}${result.stderr}`.trim();
+}
+
+async function runRepositoryCommand(
+  options: PiRunnerServiceOptions,
+  localPath: string,
+  args: string[],
+): Promise<string> {
+  return runCommandText(options, "git", ["-C", localPath, ...args]);
+}
+
+async function runNpmScript(
+  options: PiRunnerServiceOptions,
+  localPath: string,
+  scriptName: string,
+): Promise<string> {
+  return runCommandText(options, "npm", ["--prefix", localPath, "run", scriptName]);
+}
+
+function isStaticAnalysisFailure(report: WatchReport): boolean {
+  if (!shouldAskPiForReadOnlyDiagnosis(report.decision.action)) {
+    return false;
+  }
+
+  return report.decision.failedChecks.some((check) => {
+    const text = `${check.name} ${check.workflow ?? ""}`.toLowerCase();
+    return staticAnalysisCheckNames.some((name) => text.includes(name));
+  });
+}
+
+type Ts2322NumericStringFix = {
+  absolutePath: string;
+  lineIndex: number;
+  nextLine: string;
+  previousLine: string;
+};
+
+function findTs2322NumericStringFix(
+  localPath: string,
+  output: string,
+): Ts2322NumericStringFix | null {
+  const match = output.match(
+    /^(.+\.tsx?)\((\d+),(\d+)\): error TS2322: Type 'number' is not assignable to type 'string'\./m,
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const relativeFilePath = match[1];
+  const lineIndex = Number(match[2]) - 1;
+
+  if (!Number.isInteger(lineIndex) || lineIndex < 0) {
+    return null;
+  }
+
+  return {
+    absolutePath: path.resolve(localPath, relativeFilePath),
+    lineIndex,
+    nextLine: "",
+    previousLine: "",
+  };
+}
+
+async function applyTs2322NumericStringFix(
+  localPath: string,
+  output: string,
+): Promise<Ts2322NumericStringFix | null> {
+  const fix = findTs2322NumericStringFix(localPath, output);
+
+  if (!fix) {
+    return null;
+  }
+
+  const file = await readFile(fix.absolutePath, "utf8");
+  const lines = file.split("\n");
+  const previousLine = lines[fix.lineIndex];
+
+  if (typeof previousLine !== "string") {
+    return null;
+  }
+
+  const nextLine = previousLine.replace(/(:\s*string\s*=\s*)(\d+)(\s*;?\s*)$/, '$1"$2"$3');
+
+  if (nextLine === previousLine) {
+    return null;
+  }
+
+  lines[fix.lineIndex] = nextLine;
+  await writeFile(fix.absolutePath, lines.join("\n"), "utf8");
+
+  return {
+    ...fix,
+    nextLine,
+    previousLine,
+  };
+}
+
+async function tryStaticAnalysisAutofix(
+  options: PiRunnerServiceOptions,
+  session: PiRunnerSessionSnapshot,
+  report: WatchReport,
+): Promise<boolean> {
+  if (!isStaticAnalysisFailure(report)) {
+    return false;
+  }
+
+  await recordSessionActivity(session, {
+    timestamp: nowIso(options),
+    kind: "system",
+    status: "pending",
+    title: "Static analysis autofix started",
+    summary: "Attempting a narrow local fix for the current static-analysis failure.",
+    detail: null,
+    stream: "system",
+  });
+
+  const currentBranch = (
+    await runRepositoryCommand(options, session.localPath, ["branch", "--show-current"])
+  ).trim();
+
+  if (currentBranch !== report.snapshot.pr.headBranch) {
+    await recordSessionActivity(session, {
+      timestamp: nowIso(options),
+      kind: "important-output",
+      status: "failed",
+      title: "Static analysis autofix blocked",
+      summary: `Local branch ${currentBranch || "(detached)"} does not match PR head ${report.snapshot.pr.headBranch}.`,
+      detail: null,
+      stream: "system",
+    });
+    return false;
+  }
+
+  const dirtyState = await runRepositoryCommand(options, session.localPath, [
+    "status",
+    "--porcelain",
+  ]);
+
+  if (dirtyState.trim()) {
+    await recordSessionActivity(session, {
+      timestamp: nowIso(options),
+      kind: "important-output",
+      status: "failed",
+      title: "Static analysis autofix blocked",
+      summary: "The mapped repository has uncommitted changes; refusing to edit or push.",
+      detail: dirtyState,
+      stream: "system",
+    });
+    return false;
+  }
+
+  let typecheckOutput = "";
+
+  try {
+    typecheckOutput = await runNpmScript(options, session.localPath, "typecheck");
+  } catch (error) {
+    typecheckOutput = commandOutput(error);
+  }
+
+  const fix = await applyTs2322NumericStringFix(session.localPath, typecheckOutput);
+
+  if (!fix) {
+    await recordSessionActivity(session, {
+      timestamp: nowIso(options),
+      kind: "important-output",
+      status: "failed",
+      title: "Static analysis autofix unavailable",
+      summary: "No supported TS2322 numeric-to-string fix was found in local typecheck output.",
+      detail: typecheckOutput || null,
+      stream: "system",
+    });
+    return false;
+  }
+
+  await recordSessionActivity(session, {
+    timestamp: nowIso(options),
+    kind: "system",
+    status: "info",
+    title: "Static analysis fix applied",
+    summary: `Updated ${path.relative(session.localPath, fix.absolutePath)}:${fix.lineIndex + 1}.`,
+    detail: `${fix.previousLine}\n${fix.nextLine}`,
+    stream: "system",
+  });
+
+  await runNpmScript(options, session.localPath, "check");
+  await runRepositoryCommand(options, session.localPath, [
+    "add",
+    path.relative(session.localPath, fix.absolutePath),
+  ]);
+  await runRepositoryCommand(options, session.localPath, [
+    "commit",
+    "-m",
+    staticAnalysisAutofixCommitMessage,
+  ]);
+  await runRepositoryCommand(options, session.localPath, ["push", "origin", currentBranch]);
+
+  await recordSessionActivity(session, {
+    timestamp: nowIso(options),
+    kind: "system",
+    status: "success",
+    title: "Static analysis fix pushed",
+    summary: `Committed and pushed ${staticAnalysisAutofixCommitMessage}.`,
+    detail: null,
+    stream: "system",
+  });
+
+  return true;
 }
 
 function createPiWatchUpdatePrompt(report: WatchReport, localPath: string): string {
@@ -854,7 +1091,19 @@ async function runBabysitWatchLoop(
       return;
     }
 
-    if (shouldAskPiForReadOnlyDiagnosis(report.decision.action)) {
+    const staticAnalysisFixed = await tryStaticAnalysisAutofix(options, session, report);
+
+    if (staticAnalysisFixed) {
+      await recordSessionActivity(session, {
+        timestamp: nowIso(options),
+        kind: "system",
+        status: "info",
+        title: "PR watch continuing",
+        summary: "A fix was pushed; waiting for GitHub to report the new PR state.",
+        detail: null,
+        stream: "system",
+      });
+    } else if (shouldAskPiForReadOnlyDiagnosis(report.decision.action)) {
       const diagnosisPromptKey = getWatchDiagnosisPromptKey(report);
       if (runtime.promptedWatchKeys.has(diagnosisPromptKey)) {
         await recordSessionActivity(session, {

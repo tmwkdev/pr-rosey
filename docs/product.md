@@ -28,4 +28,5 @@ PRs.
 - GitHub OAuth or hosted auth.
 - Hosted backend or team accounts.
 - Automatic pushing, PR comments, review-thread resolution, CI reruns, or merging without an
-  explicit approved capability gate.
+  explicit approved capability gate. The current approved exception is the narrow static-analysis
+  autofix path, which may commit and push only after local checks pass on the PR head branch.

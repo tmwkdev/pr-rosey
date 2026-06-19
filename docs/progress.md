@@ -17,9 +17,10 @@ into `docs/plans/completed/` when it matters later.
   `BABYSIT REPORT` prompt. The main-process watch loop now evaluates PR state first, starts Pi only
   when repository diagnosis is needed, and sends a read-only `PR-WATCH UPDATE` when the watcher
   selects a branch-failure or early-failed-job diagnosis path.
-- Safety preserved: no hosted backend, OAuth, automatic commits, pushes, merges, GitHub comments,
-  review-thread resolution, or CI reruns were added. Pi remains constrained to read-only tools when
-  prompted.
+- Safety preserved: no hosted backend, OAuth, merges, GitHub comments, review-thread resolution, or
+  CI reruns were added. The only new write path is the approved static-analysis autofix path, which
+  verifies the mapped repo is clean and on the PR head branch, runs local checks, then commits and
+  pushes that fix. Pi remains constrained to read-only tools when prompted.
 - Verification: focused PR-watch tests passed with 16 tests; focused desktop Pi runner tests passed
   with 11 tests; final `npm run check` passed with lint, typecheck, and 46 tests; `npm run dev`
   launched Electron/Vite at `http://localhost:5173/`, and `curl -I` returned HTTP 200.
