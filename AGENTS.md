@@ -33,7 +33,7 @@ explicit approved capability gate.
 - `apps/desktop/` owns the Electron desktop application.
 - `packages/pr-watch/` owns the private local-first PR watching package and CLI.
 - `skills/` owns repo-local agent skills.
-- `docs/` owns durable project notes, active plans, and handoff receipts.
+- `docs/` owns the docs map, active/paused/completed plans, and the current restart note.
 
 Root-level files should coordinate the workspace, not hold app- or package-specific implementation
 rules when a nearer `AGENTS.md` can own them.
@@ -62,18 +62,28 @@ workspace `AGENTS.md` lists them.
 - Use Vitest only where it adds useful confidence.
 - Avoid unrelated refactors and metadata churn.
 
-## Harness
+## Operating Loop
 
-Use `docs/harness.md` as the current product-development harness. Product work should follow:
+The harness has three jobs: state what is allowed, state the current work, and prove the work
+passed. Keep it small.
 
-1. Working code.
-2. Iteration and verification.
-3. Independent review by a separate agent.
-4. Minimal documentation of what changed and what remains.
+Before product or workflow changes:
 
-Use `docs/README.md` as the documentation map. Read any active work item under
-`docs/plans/active/` before making product changes. Keep documentation thin and practical; do not
-block useful implementation on speculative docs.
+- Read this file, `docs/README.md`, `docs/progress.md`, and the relevant active plan.
+- Read the nearest nested `AGENTS.md` before changing a workspace under `apps/` or `packages/`.
+- If no active plan fits, stop and ask before starting broad product work.
+
+During work:
+
+- Make the smallest coherent change that satisfies the approved scope.
+- Prefer working behavior and targeted verification over speculative docs.
+- Update docs only when they change the next agent's decision, constraints, or verification path.
+
+After work:
+
+- Run the validation named by the plan or the smallest meaningful check for maintenance changes.
+- Update `docs/progress.md` only with the current restart state, known risk, and next step.
+- Stop after the approved work item; do not continue to adjacent work without approval.
 
 ## Agent Skills
 
@@ -84,13 +94,18 @@ Repo-local skills live under `skills/`.
 - PR babysitting agents should use `skills/pr-watch-skill/SKILL.md`.
 - If the agent runtime does not auto-discover repo-local skills, read the relevant `SKILL.md`
   directly before starting.
-- The review gate must be performed by a separate agent from the implementer. The implementing agent
-  can coordinate the review and fix findings, but must not review its own completed chunk.
+
+Use `skills/pr-rosey-reviewer/SKILL.md` when a separate review is required.
+
+Separate review is required for product behavior, GitHub interaction, runner or agent execution,
+IPC, persistence, credentials, local system access, and security boundaries. It is optional for docs
+cleanup, fixture-only changes, copy edits, and mechanical refactors when checks pass and risk is
+low.
 
 ## Testing And Check Expectations
 
-Before reporting implementation work complete, run `npm run check`. If Electron behavior changed,
-also launch the app with `npm run dev` and verify the relevant screen manually.
+Before reporting product implementation complete, run `npm run check`. If Electron behavior
+changed, also launch the app with `npm run dev` and verify the relevant screen manually.
 
 Documentation-only changes may use the smallest meaningful check, but report exactly what was and
 was not run.

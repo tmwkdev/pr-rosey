@@ -9,7 +9,6 @@ the next agent or human who needs to make a product change.
 - `../apps/desktop/AGENTS.md` - desktop app architecture, IPC, renderer UI, and app-local checks
 - `../packages/pr-watch/AGENTS.md` - PR watch package boundary, CLI, fixtures, and package-local
   checks
-- `harness.md` - how agents should work in this repo
 - `product.md` - product purpose, boundaries, and current product surface
 - `architecture.md` - Electron layer ownership and IPC boundaries
 - `agent-runner.md` - managed PR runner direction, Pi integration, auth, worktrees, and delivery
@@ -18,8 +17,8 @@ the next agent or human who needs to make a product change.
 - `babysit-skill-goal.md` - PR babysitting skill success scorecard
 - `babysit-skill-adoption-review.md` - human similarity-review checklist for adopting the PR watch
   skill
-- `progress.md` - latest handoff state and verification notes
-- `plans/` - active and completed work items
+- `progress.md` - current restart state, known risk, and next step
+- `plans/` - active, paused, and completed work items
 - `plan-template.md` - template for approved work items
 - `../apps/desktop/` - Electron desktop app workspace
 - `../packages/pr-watch/` - private PR watch package used by the PR babysitting skill

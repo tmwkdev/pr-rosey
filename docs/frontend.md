@@ -1,7 +1,7 @@
 # Frontend Practices
 
-This doc is the renderer UI guidance for pr-rosey. Keep `docs/harness.md` focused on process; keep
-component choice, styling, and visual-system rules here.
+This doc is the renderer UI guidance for pr-rosey. Keep component choice, styling, and visual-system
+rules here.
 
 Use this as an agent-readable component guide. Before inventing markup or styling, identify the UI
 job, choose the closest component pattern, and check the "do not use for" notes. The goal is a quiet,

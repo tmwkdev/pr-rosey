@@ -6,11 +6,14 @@ time, and not every change needs a heavyweight plan.
 ## Folders
 
 - `active/` contains currently approved work items.
+- `paused/` contains previously active work that should not guide current implementation until a
+  human explicitly resumes it.
 - `completed/` contains completed work items that are still useful as history.
 
 ## When To Add A Plan
 
-Add a plan when the work needs explicit acceptance criteria, crosses Electron boundaries, or changes
-user-visible behavior.
+Add a plan when the work needs explicit acceptance criteria, crosses Electron boundaries, changes
+user-visible behavior, or changes agent workflow rules.
 
-Small maintenance changes can use `docs/progress.md` instead.
+Small maintenance changes can use the user request and final report instead. Keep one active plan by
+default; if multiple plans exist, `active/README.md` must say which one is next.

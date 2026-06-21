@@ -1,11 +1,12 @@
 ---
 name: pr-rosey-reviewer
-description: Independently review a completed pr-rosey implementation chunk before it is reported complete. Use only from a separate reviewer agent, never the agent that implemented the change, to check scope, correctness, architecture boundaries, tests, documentation, and remaining risk.
+description: Independently review a completed pr-rosey change when the work has meaningful product, security, persistence, IPC, GitHub, runner, credential, or local-system risk. Use only from a separate reviewer agent, never the agent that implemented the change.
 ---
 
 # pr-rosey Reviewer
 
-Use this skill to review a completed implementation chunk from a different agent.
+Use this skill to review a completed change from a different agent when separate review is required
+by `AGENTS.md` or requested by the user.
 
 ## Independence Rule
 
@@ -37,7 +38,7 @@ Avoid proposing unrelated refactors or future product work.
 
 ## Review Workflow
 
-1. Read `AGENTS.md`, `docs/harness.md`, and any active plan relevant to the change.
+1. Read `AGENTS.md` and any active plan relevant to the change.
 2. Inspect the diff against the target branch.
 3. Run or verify the relevant checks when feasible. At minimum, confirm whether `npm run check` was run.
 4. Compare the implementation to the acceptance criteria and project boundaries.

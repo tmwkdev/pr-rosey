@@ -21,7 +21,8 @@ Human reviewer steps:
 3. Confirm that similarities are limited to ordinary GitHub, CI, pull-request, and CLI concepts.
 4. Confirm the local implementation does not copy prose, comments, function names, data shapes,
    module boundaries, fixtures, test structure, or control flow from the reference.
-5. Record the result in `docs/progress.md` before considering the scorecard passed.
+5. Record the result in the active plan or `docs/progress.md` before considering the scorecard
+   passed.
 
 Pass only if all statements are true:
 

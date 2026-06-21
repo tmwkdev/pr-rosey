@@ -1,8 +1,8 @@
 # Active Plans
 
-Active product plans:
+Active approved plans:
 
-- `pi-managed-pr-runner-spike.md` - prove Pi RPC can run in a managed local PR worktree with
-  visible session state and abort.
-- `pi-session-console-ui.md` - turn the approved Pi session console mockup into the real renderer
-  detail surface, with display-only steering affordance.
+- `harness-cleanup.md` - simplify the repo harness before returning to skill stabilization or UI
+  work.
+
+Paused plans live under `../paused/` and are not approved active work until explicitly resumed.
