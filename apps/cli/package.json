@@ -23,6 +23,11 @@
     "typecheck": "tsgo -b --pretty false"
   },
   "dependencies": {
+    "ink": "7.1.0",
+    "react": "19.2.7",
     "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17"
   }
 }
