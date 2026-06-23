@@ -1,0 +1,35 @@
+{
+    "name": "pr-rosey",
+    "version": "0.0.0",
+    "private": true,
+    "description": "TypeScript monorepo for the pr-rosey CLI.",
+    "type": "module",
+    "packageManager": "npm@11.14.1",
+    "engines": {
+        "node": ">=24.0.0",
+        "npm": ">=11.0.0"
+    },
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "build": "tsgo -b && node -e \"const { chmodSync, existsSync } = require('node:fs'); const bin = 'apps/cli/dist/index.js'; if (existsSync(bin)) chmodSync(bin, 0o755);\"",
+        "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
+        "clean": "node --run clean:workspaces",
+        "clean:workspaces": "node -e \"const { rmSync } = require('node:fs'); for (const dir of ['apps/cli/dist', 'packages/shared/dist', 'coverage']) rmSync(dir, { recursive: true, force: true });\"",
+        "cli": "npm --workspace @pr-rosey/cli run start",
+        "format": "biome check --write . && prettier --write .",
+        "format:check": "biome format . && prettier --check .",
+        "lint": "biome lint .",
+        "test": "vitest run",
+        "typecheck": "tsgo -b --pretty false"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "2.5.0",
+        "@types/node": "26.0.0",
+        "@typescript/native-preview": "7.0.0-dev.20260622.1",
+        "prettier": "3.8.4",
+        "vitest": "4.1.9"
+    }
+}
