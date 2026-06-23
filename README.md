@@ -8,7 +8,7 @@ TypeScript monorepo for the pr-rosey CLI.
 
 ## Workspaces
 
-- `apps/cli` - hello-world CLI package published locally as `pr-rosey`
+- `apps/cli` - CLI package published locally as `pr-rosey`
 
 ## Tooling
 
@@ -24,17 +24,36 @@ TypeScript monorepo for the pr-rosey CLI.
 npm install
 npm run build
 npm run check
-npm run cli -- Rosey
+npm run cli -- snapshot
 ```
 
 After `npm run build`, the generated CLI can also be executed directly:
 
 ```bash
-./apps/cli/dist/index.js Rosey
+./apps/cli/dist/index.js snapshot
 ```
 
-Expected output:
+To snapshot a specific pull request, pass a PR number, branch, or URL:
 
-```text
-Hello, Rosey!
+```bash
+npm run cli -- snapshot 123
+```
+
+Expected output is normalized JSON with PR metadata, check buckets, review counts, and a recommended
+next read-only action:
+
+```json
+{
+  "pr": {
+    "number": 123,
+    "state": "OPEN"
+  },
+  "checks": {
+    "total": 1,
+    "failing": []
+  },
+  "nextAction": {
+    "kind": "ready"
+  }
+}
 ```
