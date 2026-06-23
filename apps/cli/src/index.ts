@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createGreeting } from "@pr-rosey/shared";
+import { createGreeting } from "./greeting.js";
 
 const subject = process.argv.slice(2).join(" ") || "world";
 

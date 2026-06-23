@@ -1,11 +1,8 @@
 {
-    "files": [],
-    "references": [
-        {
-            "path": "./packages/shared"
-        },
-        {
-            "path": "./apps/cli"
-        }
-    ]
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/cli"
+    }
+  ]
 }

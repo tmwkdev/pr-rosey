@@ -9,7 +9,6 @@ TypeScript monorepo for the pr-rosey CLI.
 ## Workspaces
 
 - `apps/cli` - hello-world CLI package published locally as `pr-rosey`
-- `packages/shared` - shared TypeScript package used by the CLI
 
 ## Tooling
 

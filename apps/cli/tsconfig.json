@@ -1,15 +1,10 @@
 {
-    "extends": "../../tsconfig.base.json",
-    "compilerOptions": {
-        "composite": true,
-        "outDir": "dist",
-        "rootDir": "src",
-        "tsBuildInfoFile": "dist/.tsbuildinfo"
-    },
-    "include": ["src/**/*.ts"],
-    "references": [
-        {
-            "path": "../../packages/shared"
-        }
-    ]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"]
 }
